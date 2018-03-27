@@ -28,7 +28,7 @@ class Ps_MenuTopLinks
 {
     public static function gets($id_lang, $id_linksmenutop = null, $id_shop)
     {
-        $sql = 'SELECT l.id_linksmenutop, l.new_window, s.name, ll.link, ll.label
+        $sql = 'SELECT l.id_linksmenutop, l.new_window, l.relative_link, s.name, ll.link, ll.label
 				FROM '._DB_PREFIX_.'linksmenutop l
 				LEFT JOIN '._DB_PREFIX_.'linksmenutop_lang ll ON (l.id_linksmenutop = ll.id_linksmenutop AND ll.id_lang = '.(int)$id_lang.' AND ll.id_shop='.(int)$id_shop.')
 				LEFT JOIN '._DB_PREFIX_.'shop s ON l.id_shop = s.id_shop
@@ -46,7 +46,7 @@ class Ps_MenuTopLinks
     public static function getLinkLang($id_linksmenutop, $id_shop)
     {
         $ret = Db::getInstance()->executeS('
-			SELECT l.id_linksmenutop, l.new_window, ll.link, ll.label, ll.id_lang
+			SELECT l.id_linksmenutop, l.new_window, l.relative_link, ll.link, ll.label, ll.id_lang
 			FROM '._DB_PREFIX_.'linksmenutop l
 			LEFT JOIN '._DB_PREFIX_.'linksmenutop_lang ll ON (l.id_linksmenutop = ll.id_linksmenutop AND ll.id_shop='.(int)$id_shop.')
 			WHERE 1
@@ -57,14 +57,16 @@ class Ps_MenuTopLinks
         $link = array();
         $label = array();
         $new_window = false;
+        $relative_link = false;
 
         foreach ($ret as $line) {
             $link[$line['id_lang']] = Tools::safeOutput($line['link']);
             $label[$line['id_lang']] = Tools::safeOutput($line['label']);
             $new_window = (bool)$line['new_window'];
+            $relative_link = (bool)$line['relative_link'];
         }
 
-        return array('link' => $link, 'label' => $label, 'new_window' => $new_window);
+        return array('link' => $link, 'label' => $label, 'new_window' => $new_window, 'relative_link' => $relative_link);
     }
 
     public static function updateUrl($link)
@@ -77,7 +79,7 @@ class Ps_MenuTopLinks
         return $link;
     }
 
-    public static function add($link, $label, $newWindow = 0, $id_shop)
+    public static function add($link, $label, $newWindow = 0, $relativeLink = 0, $id_shop)
     {
         if (!is_array($label)) {
             return false;
@@ -86,11 +88,14 @@ class Ps_MenuTopLinks
             return false;
         }
 
-        $link = self::updateUrl($link);
+        if (!$relativeLink) {
+            $link = self::updateUrl($link);
+        }
         Db::getInstance()->insert(
             'linksmenutop',
             array(
                 'new_window'=>(int)$newWindow,
+                'relative_link'=>(int)$relativeLink,
                 'id_shop' => (int)$id_shop
             )
         );
@@ -114,7 +119,7 @@ class Ps_MenuTopLinks
         return $result;
     }
 
-    public static function update($link, $labels, $newWindow = 0, $id_shop, $id_link)
+    public static function update($link, $labels, $newWindow = 0, $relativeLink = 0, $id_shop, $id_link)
     {
         if (!is_array($labels)) {
             return false;
@@ -123,11 +128,14 @@ class Ps_MenuTopLinks
             return false;
         }
 
-        $link = self::updateUrl($link);
+        if (!$relativeLink) {
+            $link = self::updateUrl($link);
+        }
         Db::getInstance()->update(
             'linksmenutop',
             array(
                 'new_window'=>(int)$newWindow,
+                'relative_link'=>(int)$relativeLink,
                 'id_shop' => (int)$id_shop
             ),
             'id_linksmenutop = '.(int)$id_link

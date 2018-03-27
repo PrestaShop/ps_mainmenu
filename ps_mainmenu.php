@@ -107,6 +107,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
 			`id_linksmenutop` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
 			`id_shop` INT(11) UNSIGNED NOT NULL,
 			`new_window` TINYINT( 1 ) NOT NULL,
+			`relative_link` TINYINT( 1 ) NOT NULL,
 			INDEX (`id_shop`)
 		) ENGINE = '._MYSQL_ENGINE_.' CHARACTER SET utf8 COLLATE utf8_general_ci;') &&
             Db::getInstance()->execute('
@@ -223,7 +224,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
                         $shops = Shop::getContextListShopID();
 
                         foreach ($shops as $shop_id) {
-                            $added = Ps_MenuTopLinks::add($links_label, $labels,  Tools::getValue('new_window', 0), (int)$shop_id);
+                            $added = Ps_MenuTopLinks::add($links_label, $labels,  Tools::getValue('new_window', 0),  Tools::getValue('relative_link', 0), (int)$shop_id);
 
                             if (!$added) {
                                 $shop = new Shop($shop_id);
@@ -269,13 +270,14 @@ class Ps_MainMenu extends Module implements WidgetInterface
                     $link = array();
                     $label = array();
                     $new_window = (int)Tools::getValue('new_window', 0);
+                    $relative_link = (int)Tools::getValue('relative_link', 0);
 
                     foreach (Language::getLanguages(false) as $lang) {
                         $link[$lang['id_lang']] = Tools::getValue('link_'.(int)$lang['id_lang']);
                         $label[$lang['id_lang']] = Tools::getValue('label_'.(int)$lang['id_lang']);
                     }
 
-                    Ps_MenuTopLinks::update($link, $label, $new_window, (int)$id_shop, (int)$id_linksmenutop);
+                    Ps_MenuTopLinks::update($link, $label, $new_window, $relative_link, (int)$id_shop, (int)$id_linksmenutop);
                     $this->_html .= $this->displayConfirmation($this->trans('The link has been edited.', array(), 'Modules.Mainmenu.Admin'));
                 }
                 $update_cache = true;
@@ -466,6 +468,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
             'url' => '',
             'children' => [],
             'open_in_new_window' => false,
+            'is_relative_link' => false,
             'image_urls' => [],
             'page_identifier' => null
         ];
@@ -667,7 +670,8 @@ class Ps_MainMenu extends Module implements WidgetInterface
                             'page_identifier' => 'lnk-' . Tools::str2url($link[0]['label']),
                             'label' => $link[0]['label'],
                             'url' => $link[0]['link'],
-                            'open_in_new_window' => $link[0]['new_window']
+                            'open_in_new_window' => $link[0]['new_window'],
+                            'is_relative_link' => $link[0]['relative_link']
                         ]);
                     }
                     break;
@@ -970,8 +974,8 @@ class Ps_MainMenu extends Module implements WidgetInterface
 
         foreach ($linksmenutop as $id => $link) {
             Db::getInstance()->execute('
-				INSERT IGNORE INTO '._DB_PREFIX_.'linksmenutop (id_linksmenutop, id_shop, new_window)
-				VALUES (null, '.(int)$params['new_id_shop'].', '.(int)$link['new_window'].')');
+				INSERT IGNORE INTO '._DB_PREFIX_.'linksmenutop (id_linksmenutop, id_shop, new_window, relative_link)
+				VALUES (null, '.(int)$params['new_id_shop'].', '.(int)$link['new_window'].', '.(int)$link['relative_link'].')');
 
             $linksmenutop[$id]['new_id_linksmenutop'] = Db::getInstance()->Insert_ID();
         }
@@ -1080,6 +1084,24 @@ class Ps_MainMenu extends Module implements WidgetInterface
                         'type' => 'switch',
                         'label' => $this->trans('New window', array(), 'Admin.Navigation.Header'),
                         'name' => 'new_window',
+                        'is_bool' => true,
+                        'values' => array(
+                            array(
+                                'id' => 'active_on',
+                                'value' => 1,
+                                'label' => $this->trans('Enabled', array(), 'Admin.Global')
+                            ),
+                            array(
+                                'id' => 'active_off',
+                                'value' => 0,
+                                'label' => $this->trans('Disabled', array(), 'Admin.Global')
+                            )
+                        ),
+                    ),
+                    array(
+                        'type' => 'switch',
+                        'label' => $this->trans('Relative link', array(), 'Admin.Navigation.Header'),
+                        'name' => 'relative_link',
                         'is_bool' => true,
                         'values' => array(
                             array(
@@ -1277,6 +1299,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
         $links_label_edit = '';
         $labels_edit = '';
         $new_window_edit = '';
+        $relative_link_edit = '';
 
         if (Tools::isSubmit('updatelinksmenutop')) {
             $link = Ps_MenuTopLinks::getLinkLang(Tools::getValue('id_linksmenutop'), (int)Shop::getContextShopID());
@@ -1288,10 +1311,12 @@ class Ps_MainMenu extends Module implements WidgetInterface
             $links_label_edit = $link['link'];
             $labels_edit = $link['label'];
             $new_window_edit = $link['new_window'];
+            $relative_link_edit = $link['relative_link'];
         }
 
         $fields_values = array(
             'new_window' => Tools::getValue('new_window', $new_window_edit),
+            'relative_link' => Tools::getValue('relative_link', $relative_link_edit),
             'id_linksmenutop' => Tools::getValue('id_linksmenutop'),
         );
 
@@ -1340,6 +1365,12 @@ class Ps_MainMenu extends Module implements WidgetInterface
             ),
             'new_window' => array(
                 'title' => $this->trans('New window', array(), 'Admin.Navigation.Header'),
+                'type' => 'bool',
+                'align' => 'center',
+                'active' => 'status',
+            ),
+            'relative_link' => array(
+                'title' => $this->trans('Relative link', array(), 'Admin.Navigation.Header'),
                 'type' => 'bool',
                 'align' => 'center',
                 'active' => 'status',
