@@ -67,14 +67,14 @@ class Ps_MenuTopLinks
         return array('link' => $link, 'label' => $label, 'new_window' => $new_window);
     }
 
-    public static function updateUrl($link)
+    public static function updateUrl($links)
     {
-        for($i = 1; $i <= count($link); $i++) {
-            if (substr($link[$i], 0, 7) !== "http://" && substr($link[$i], 0, 8) !== "https://") {
-                $link[$i] = "http://" . $link[$i];
+        foreach ($links as &$link){
+            if (substr($link, 0, 7) !== "http://" && substr($link, 0, 8) !== "https://") {
+                $link = "http://" . $link;
             }
         }
-        return $link;
+        return $links;
     }
 
     public static function add($link, $label, $newWindow = 0, $id_shop)
