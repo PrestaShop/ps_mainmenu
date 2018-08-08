@@ -737,16 +737,17 @@ class Ps_MainMenu extends Module implements WidgetInterface
             if (isset($category['children']) && !empty($category['children'])) {
                 $node['children'] = $this->generateCategoriesMenu($category['children'], 1);
             }
-                $files = scandir(_PS_CAT_IMG_DIR_);
+            
+            $files = scandir(_PS_CAT_IMG_DIR_);
 
-                if (count(preg_grep('/^'.$category['id_category'].'-([0-9])?_thumb.jpg/i', $files)) > 0) {
-                    foreach ($files as $file) {
-                        if (preg_match('/^'.$category['id_category'].'-([0-9])?_thumb.jpg/i', $file) === 1) {
-                            $image_url = $this->context->link->getMediaLink(_THEME_CAT_DIR_.$file);
-                            $node['image_urls'][] = $image_url;
-                        }
+            if (count(preg_grep('/^'.$category['id_category'].'-([0-9])?_thumb.jpg/i', $files)) > 0) {
+                foreach ($files as $file) {
+                    if (preg_match('/^'.$category['id_category'].'-([0-9])?_thumb.jpg/i', $file) === 1) {
+                        $image_url = $this->context->link->getMediaLink(_THEME_CAT_DIR_.$file);
+                        $node['image_urls'][] = $image_url;
                     }
                 }
+            }
 
             $nodes[] = $node;
         }
