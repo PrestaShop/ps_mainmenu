@@ -497,7 +497,8 @@ class Ps_MainMenu extends Module implements WidgetInterface
                 'label' => $page['meta_title'],
                 'url' => $this->context->link->getCMSLink(
                     new CMS($page['id_cms'], $id_lang),
-                    null, null,
+                    null,
+                    null,
                     $id_lang
                 ),
             ]);
