@@ -1054,7 +1054,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
                         'icon' => 'icon-link'
                     ),
                     'info' => '<div class="alert alert-warning">'.
-                        $this->trans('All active products combinations quantities will be changed', array(), 'Modules.Mainmenu.Admin').'</div>',
+                        $this->trans('Please, select the shop you want to edit', array(), 'Modules.Mainmenu.Admin').'</div>',
                     'submit' => array(
                         'name' => 'submitBlocktopmenu',
                         'title' => $this->trans('Save', array(), 'Admin.Actions')
