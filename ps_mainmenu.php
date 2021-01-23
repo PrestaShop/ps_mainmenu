@@ -712,7 +712,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
         return $html;
     }
 
-    protected function generateCategoriesMenu($categories, $is_children = 0)
+    protected function generateCategoriesMenu($categories)
     {
         $nodes = [];
 
@@ -744,7 +744,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
             $node['image_urls']  = [];
 
             if (isset($category['children']) && !empty($category['children'])) {
-                $node['children'] = $this->generateCategoriesMenu($category['children'], 1);
+                $node['children'] = $this->generateCategoriesMenu($category['children']);
 
                 if ($this->imageFiles === null) {
                     $this->imageFiles = scandir(_PS_CAT_IMG_DIR_);
