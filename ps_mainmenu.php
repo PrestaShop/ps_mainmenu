@@ -738,8 +738,6 @@ class Ps_MainMenu extends Module implements WidgetInterface
                 continue;
             }
 
-            $current = $this->page_name == 'category' && (int)Tools::getValue('id_category') == (int)$category['id_category'];
-            $node['current'] = $current;
             $node['label']   = $category['name'];
             $node['image_urls']  = [];
 
