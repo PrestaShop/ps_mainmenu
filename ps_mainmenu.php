@@ -1160,7 +1160,6 @@ class Ps_MainMenu extends Module implements WidgetInterface
             '&configure='.$this->name.'&tab_module='.$this->tab.'&module_name='.$this->name;
         $helper->token = Tools::getAdminTokenLite('AdminModules');
         $helper->languages = $this->context->controller->getLanguages();
-        $helper->default_form_language = (int)$this->context->language->id;
 
         return $helper->generateForm(array($fields_form));
     }
