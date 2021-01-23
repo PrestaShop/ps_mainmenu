@@ -1016,7 +1016,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
             foreach ($lang as $l) {
                 Db::getInstance()->execute('
 					INSERT IGNORE INTO '._DB_PREFIX_.'linksmenutop_lang (id_linksmenutop, id_lang, id_shop, label, link)
-					VALUES ('.(int)$link['new_id_linksmenutop'].', '.(int)$l['id_lang'].', '.(int)$params['new_id_shop'].', '.(int)$l['label'].', '.(int)$l['link'].' )');
+					VALUES ('.(int)$link['new_id_linksmenutop'].', '.(int)$l['id_lang'].', '.(int)$params['new_id_shop'].', \''.pSQL($l['label']).'\', \''.pSQL($l['link']).'\' )');
             }
         }
     }
