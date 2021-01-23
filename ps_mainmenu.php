@@ -1200,7 +1200,6 @@ class Ps_MainMenu extends Module implements WidgetInterface
         $html .= '</optgroup>';
 
         // BEGIN Categories
-        $shop = new Shop((int)Shop::getContextShopID());
         $html .= '<optgroup label="'.$this->trans('Categories', array(), 'Admin.Global').'">';
 
         $shops_to_get = Shop::getContextListShopID();
