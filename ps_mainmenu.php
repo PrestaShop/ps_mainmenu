@@ -483,7 +483,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
     {
         $category = new CMSCategory($id_cms_category, $id_lang);
 
-        $rawSubCategories = $this->getCMSCategories(false, $id_cms_category, $id_lang);
+        $rawSubCategories = $this->getCMSCategories(false, $id_cms_category, $id_lang, (int)$id_shop);
         $rawSubPages = $this->getCMSPages($id_cms_category);
 
         $subCategories = array_map(function ($category) use ($id_lang) {
