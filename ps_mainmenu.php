@@ -171,7 +171,6 @@ class Ps_MainMenu extends Module implements WidgetInterface
         $labels = Tools::getValue('label') ? array_filter(Tools::getValue('label'), 'strlen') : array();
         $links_label = Tools::getValue('link') ? array_filter(Tools::getValue('link'), 'strlen') : array();
         $spacer = str_repeat('&nbsp;', $this->spacer_size);
-        $divLangName = 'link_label';
 
         $update_cache = false;
 
