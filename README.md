@@ -2,7 +2,7 @@
 
 ## About
 
-Adds a new horizontal menu to the top of your PrestaShop.
+Make it easy for your visitors to find their way on your store, select the right link and turn it into a menu item.
 
 ## Reporting issues
 

@@ -1,0 +1,13 @@
+includes:
+    - %currentWorkingDirectory%/tests/phpstan/phpstan.neon
+
+parameters:
+  ignoreErrors:
+    - '#Access to an undefined property HelperList\:\:\$shopLinkType.#'
+    - '#Access to protected property HelperForm\:\:\$fields_form.#'
+    - '#Parameter \#1 \$id of class Supplier constructor expects null, int given.#'
+    - '#Parameter \#1 \$idCategory of class Category constructor expects null, int given.#'
+    - '#Parameter \#2 \$idLang of class Category constructor expects null, int given.#'
+    - '#Parameter \#2 \$idLang of class Supplier constructor expects null, int given.#'
+    - '#Parameter \#2 \$selection of static method CMSCore\:\:getLinks\(\) expects null, array<int, int> given.#'
+    - '#Parameter \#2 \$value of static method CacheCore\:\:store\(\) expects string, array<int\|string, mixed> given.#'
