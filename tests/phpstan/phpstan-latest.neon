@@ -8,3 +8,4 @@ parameters:
     - '#Parameter \#1 \$id of class Supplier constructor expects null, int given.#'
     - '#Parameter \#2 \$idLang of class Supplier constructor expects null, int given.#'
     - '#Parameter \#2 \$selection of static method CMSCore\:\:getLinks\(\) expects null, array<int, int> given.#'
+    - '~^Binary operation "\." between string and array<string> results in an error\.$~'
