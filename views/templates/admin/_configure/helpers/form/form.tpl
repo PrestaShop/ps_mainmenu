@@ -98,7 +98,7 @@ function move(up)
 {block name="input"}
     {if $input.type == 'link_choice'}
 	    <div class="row">
-	    	<div class="col-lg-1">
+	    	<div class="col-lg-1" style="min-width: 4rem">
 	    		<h4 style="margin-top:5px;">{l s='Change position' d='Modules.Mainmenu.Admin'}</h4>
                 <a href="#" id="menuOrderUp" class="btn btn-default" style="font-size:20px;display:block;"><i class="icon-chevron-up"></i></a><br/>
                 <a href="#" id="menuOrderDown" class="btn btn-default" style="font-size:20px;display:block;"><i class="icon-chevron-down"></i></a><br/>
