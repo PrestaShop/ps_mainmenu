@@ -124,7 +124,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
 			`id_shop` INT(11) UNSIGNED NOT NULL,
 			`new_window` TINYINT( 1 ) NOT NULL,
 			INDEX (`id_shop`)
-		) ENGINE = ' . _MYSQL_ENGINE_ . ' CHARACTER SET utf8 COLLATE utf8_general_ci;') &&
+		) ENGINE = ' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8mb4;') &&
             Db::getInstance()->execute('
 			 CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . 'linksmenutop_lang` (
 			`id_linksmenutop` INT(11) UNSIGNED NOT NULL,
@@ -133,7 +133,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
 			`label` VARCHAR( 128 ) NOT NULL ,
 			`link` VARCHAR( 128 ) NOT NULL ,
 			INDEX ( `id_linksmenutop` , `id_lang`, `id_shop`)
-		) ENGINE = ' . _MYSQL_ENGINE_ . ' CHARACTER SET utf8 COLLATE utf8_general_ci;');
+		) ENGINE = ' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8mb4;');
     }
 
     public function uninstall($delete_params = true)
