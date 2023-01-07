@@ -124,11 +124,10 @@ class Ps_MenuTopLinks
             Db::getInstance()->update(
                 'linksmenutop_lang',
                 [
-                    'id_shop' => (int) $id_shop,
                     'label' => pSQL($label),
                     'link' => pSQL($link[$id_lang]),
                 ],
-                'id_linksmenutop = ' . (int) $id_link . ' AND id_lang = ' . (int) $id_lang
+                'id_linksmenutop = ' . (int) $id_link . ' AND id_lang = ' . (int) $id_lang . ' AND id_shop = ' . (int) $id_shop
             );
         }
     }
