@@ -98,16 +98,16 @@ function move(up)
 {block name="input"}
     {if $input.type == 'link_choice'}
 	    <div class="row">
-	    	<div class="col-lg-1">
+	    	<div class="col-sm-2">
 	    		<h4 style="margin-top:5px;">{l s='Change position' d='Modules.Mainmenu.Admin'}</h4>
                 <a href="#" id="menuOrderUp" class="btn btn-default" style="font-size:20px;display:block;"><i class="icon-chevron-up"></i></a><br/>
                 <a href="#" id="menuOrderDown" class="btn btn-default" style="font-size:20px;display:block;"><i class="icon-chevron-down"></i></a><br/>
 	    	</div>
-	    	<div class="col-lg-4">
+	    	<div class="col-sm-5">
 	    		<h4 style="margin-top:5px;">{l s='Selected items' d='Modules.Mainmenu.Admin'}</h4>
 	    		{$selected_links}
 	    	</div>
-	    	<div class="col-lg-4">
+	    	<div class="col-sm-5">
 	    		<h4 style="margin-top:5px;">{l s='Available items' d='Modules.Mainmenu.Admin'}</h4>
 	    		{$choices}
 	    	</div>
@@ -115,9 +115,9 @@ function move(up)
 	    </div>
 	    <br/>
 	    <div class="row">
-	    	<div class="col-lg-1"></div>
-	    	<div class="col-lg-4"><a href="#" id="removeItem" class="btn btn-default"><i class="icon-arrow-right"></i> {l s='Remove' d='Modules.Mainmenu.Admin'}</a></div>
-		<div class="col-lg-4"><a href="#" id="addItem" class="btn btn-default"><i class="icon-arrow-left"></i> {l s='Add' d='Admin.Actions'}</a></div>
+	    	<div class="col-sm-2"></div>
+	    	<div class="col-sm-5"><a href="#" id="removeItem" class="btn btn-default"><i class="icon-arrow-right"></i> {l s='Remove' d='Modules.Mainmenu.Admin'}</a></div>
+		<div class="col-sm-5"><a href="#" id="addItem" class="btn btn-default"><i class="icon-arrow-left"></i> {l s='Add' d='Admin.Actions'}</a></div>
 	    </div>
 	{else}
 		{$smarty.block.parent}

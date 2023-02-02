@@ -8,6 +8,4 @@ parameters:
     - ../../ps_menutoplinks.class.php
     - ../../translations/
     - ../../views/
-  reportUnmatchedIgnoredErrors: false
   level: 5
-  
