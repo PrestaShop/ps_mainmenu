@@ -24,6 +24,7 @@
  * International Registered Trademark & Property of PrestaShop SA
  */
 
+use Hook;
 use PrestaShop\PrestaShop\Core\Module\WidgetInterface;
 
 require dirname(__FILE__) . '/ps_menutoplinks.class.php';
@@ -66,7 +67,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
     {
         $this->name = 'ps_mainmenu';
         $this->tab = 'front_office_features';
-        $this->version = '2.3.2';
+        $this->version = '2.3.3';
         $this->author = 'PrestaShop';
         $this->imageFiles = null;
 
@@ -133,7 +134,10 @@ class Ps_MainMenu extends Module implements WidgetInterface
 			`label` VARCHAR( 128 ) NOT NULL ,
 			`link` VARCHAR( 128 ) NOT NULL ,
 			INDEX ( `id_linksmenutop` , `id_lang`, `id_shop`)
-		) ENGINE = ' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8mb4;');
+		) ENGINE = ' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8mb4;') &&
+            Db::getInstance()->execute('
+            INSERT IGNORE INTO `' . _DB_PREFIX_ . 'hook` (`name`, `title`, `description`) VALUES
+            (\'actionMainMenuModifier\', \'Modify main menu view data\', \'This hook allows to alter main menu data\');');
     }
 
     public function uninstall($delete_params = true)
@@ -1493,8 +1497,12 @@ class Ps_MainMenu extends Module implements WidgetInterface
 
     public function renderWidget($hookName, array $configuration)
     {
+        $menu = $this->getWidgetVariables($hookName, $configuration);
+
+        Hook::exec('actionMainMenuModifier', ['menu' => &$menu]);
+
         $this->smarty->assign([
-            'menu' => $this->getWidgetVariables($hookName, $configuration),
+            'menu' => $menu,
         ]);
 
         return $this->fetch('module:ps_mainmenu/ps_mainmenu.tpl');
