@@ -24,5 +24,6 @@ if (!defined('_PS_VERSION_')) {
 function upgrade_module_2_3_5($module)
 {
     return Db::getInstance()->execute('INSERT IGNORE INTO `' . _DB_PREFIX_ . "hook` (`name`, `title`, `description`) VALUES
-        ('actionMainMenuModifier', 'Modify main menu view data', 'This hook allows to alter main menu data')");
+        ('actionMainMenuModifier', 'Modify main menu view data', 'This hook allows to alter main menu data')")
+        && $module->registerHook('actionMetaPageSave');
 }
