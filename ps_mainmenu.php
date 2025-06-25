@@ -795,7 +795,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
 
             if ($this->imageFiles === null) {
                 $this->imageFiles = scandir(_PS_CAT_IMG_DIR_);
-		if(false === $this->imageFiles) {
+		if (false === $this->imageFiles) {
                     $this->imageFiles = [];
                 }
             }
