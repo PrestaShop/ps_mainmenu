@@ -1432,7 +1432,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
         $helper->module = $this;
         $helper->title = $this->trans('Link list', [], 'Modules.Mainmenu.Admin');
         $helper->token = Tools::getAdminTokenLite('AdminModules');
-        $helper->currentIndex = AdminController::$currentIndex . '&configure=' . $this->name;
+        $helper->currentIndex = $this->context->link->getAdminLink('AdminModules', true) . '&configure=' . $this->name;
 
         return $helper->generateList($links, $fields_list);
     }
