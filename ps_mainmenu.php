@@ -1116,7 +1116,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
         $helper->allow_employee_form_lang = Configuration::get('PS_BO_ALLOW_EMPLOYEE_FORM_LANG') ? Configuration::get('PS_BO_ALLOW_EMPLOYEE_FORM_LANG') : 0;
         $helper->module = $this;
         $helper->identifier = $this->identifier;
-        $helper->currentIndex = $this->context->link->getAdminLink('AdminModules', false, [], ['configure'   => $this->name, 'tab_module'  => $this->tab, 'module_name' => $this->name]);
+        $helper->currentIndex = $this->context->link->getAdminLink('AdminModules', false, [], ['configure' => $this->name, 'tab_module' => $this->tab, 'module_name' => $this->name]);
         $helper->token = Tools::getAdminTokenLite('AdminModules');
         $helper->tpl_vars = [
             'languages' => $this->context->controller->getLanguages(),
@@ -1199,7 +1199,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
             $helper->fields_value['updatelink'] = '';
         }
 
-        $helper->currentIndex = $this->context->link->getAdminLink('AdminModules', false, [], ['configure'   => $this->name, 'tab_module'  => $this->tab, 'module_name' => $this->name]);
+        $helper->currentIndex = $this->context->link->getAdminLink('AdminModules', false, [], ['configure' => $this->name, 'tab_module' => $this->tab, 'module_name' => $this->name]);
         $helper->token = Tools::getAdminTokenLite('AdminModules');
         $helper->languages = $this->context->controller->getLanguages();
         $helper->default_form_language = (int) $this->context->language->id;
@@ -1430,7 +1430,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
         $helper->module = $this;
         $helper->title = $this->trans('Link list', [], 'Modules.Mainmenu.Admin');
         $helper->token = Tools::getAdminTokenLite('AdminModules');
-        $helper->currentIndex = $this->context->link->getAdminLink('AdminModules', true, [], ['configure'   => $this->name, 'tab_module'  => $this->tab, 'module_name' => $this->name]);
+        $helper->currentIndex = $this->context->link->getAdminLink('AdminModules', true, [], ['configure' => $this->name, 'tab_module' => $this->tab, 'module_name' => $this->name]);
 
         return $helper->generateList($links, $fields_list);
     }
