@@ -69,7 +69,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
     {
         $this->name = 'ps_mainmenu';
         $this->tab = 'front_office_features';
-        $this->version = '2.3.5';
+        $this->version = '2.3.6';
         $this->author = 'PrestaShop';
         $this->imageFiles = null;
 
