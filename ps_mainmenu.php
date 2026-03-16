@@ -795,6 +795,9 @@ class Ps_MainMenu extends Module implements WidgetInterface
 
             if ($this->imageFiles === null) {
                 $this->imageFiles = scandir(_PS_CAT_IMG_DIR_);
+		if (false === $this->imageFiles) {
+                    $this->imageFiles = [];
+                }
             }
 
             if (count(preg_grep('/^' . $category['id_category'] . '-([0-9])?_thumb.jpg/i', $this->imageFiles)) > 0) {
