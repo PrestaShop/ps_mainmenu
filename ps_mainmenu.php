@@ -1359,6 +1359,14 @@ class Ps_MainMenu extends Module implements WidgetInterface
                 $link['link'][$key] = Tools::htmlentitiesDecodeUTF8($label);
             }
 
+            // Decode the label as well, the same way the link is decoded above. getLinkLang()
+            // returns it HTML-entity encoded (Tools::safeOutput), so without this the edit form
+            // pre-fills with the encoded value and re-encodes it on every save, stacking the
+            // entities (e.g. "À" -> "&Agrave;" -> "&amp;Agrave;" -> ...).
+            foreach ($link['label'] as $key => $label) {
+                $link['label'][$key] = Tools::htmlentitiesDecodeUTF8($label);
+            }
+
             $links_label_edit = $link['link'];
             $labels_edit = $link['label'];
             $new_window_edit = $link['new_window'];
