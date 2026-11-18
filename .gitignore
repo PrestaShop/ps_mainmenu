@@ -2,3 +2,5 @@
 /translations/*.php
 /vendor/
 /.php_cs.cache
+/tests/Unit/.phpunit.result.cache
+/.phpunit.result.cache

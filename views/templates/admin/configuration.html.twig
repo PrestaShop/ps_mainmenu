@@ -1,0 +1,130 @@
+{#**
+ * Copyright since 2007 PrestaShop SA and Contributors
+ * PrestaShop is an International Registered Trademark & Property of PrestaShop SA
+ *
+ * NOTICE OF LICENSE
+ *
+ * This source file is subject to the Academic Free License version 3.0
+ * that is bundled with this package in the file LICENSE.md.
+ * It is also available through the world-wide-web at this URL:
+ * https://opensource.org/licenses/AFL-3.0
+ * If you did not receive a copy of the license and are unable to
+ * obtain it through the world-wide-web, please send an email
+ * to license@prestashop.com so we can send you a copy immediately.
+ *
+ * @author    PrestaShop SA and Contributors <contact@prestashop.com>
+ * @copyright Since 2007 PrestaShop SA and Contributors
+ * @license   https://opensource.org/licenses/AFL-3.0 Academic Free License version 3.0
+ *#}
+{% extends '@PrestaShop/Admin/layout.html.twig' %}
+{% trans_default_domain 'Modules.Mainmenu.Admin' %}
+
+{% block content %}
+  {% if not isSingleShopContext %}
+    <div class="alert alert-warning" role="alert">
+      <p class="alert-text">
+        {{ 'You cannot manage top menu items from a "All Shops" or a "Group Shop" context, select directly the shop you want to edit'|trans }}
+      </p>
+    </div>
+  {% elseif isMultiShopUsed %}
+    <div class="alert alert-info" role="alert">
+      <p class="alert-text">{{ 'The modifications will be applied to shop: %s'|trans|format(shopName) }}</p>
+    </div>
+  {% endif %}
+
+  {% if isSingleShopContext %}
+    {{ form_start(itemsForm, {'action': path('ps_mainmenu_configuration_save'), 'attr': {'id': 'ps-mainmenu-items-form'}}) }}
+    <div class="card">
+      <h3 class="card-header">
+        <i class="material-icons">menu</i>
+        {{ 'Menu Top Link'|trans }}
+      </h3>
+      <div class="card-body">
+        <div class="row js-menu-items" data-field-name="{{ itemsForm.items.vars.full_name }}">
+          <div class="col-lg-5">
+            <label class="form-control-label" for="ps-mainmenu-selected">{{ 'Selected items'|trans }}</label>
+            <select multiple id="ps-mainmenu-selected" class="form-control js-menu-items-selected" size="14">
+              {% for value, label in selectedItems %}
+                <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+            <div class="mt-2">
+              <button type="button" class="btn btn-outline-secondary js-menu-items-up" title="{{ 'Change position'|trans }}">
+                <i class="material-icons">keyboard_arrow_up</i>
+              </button>
+              <button type="button" class="btn btn-outline-secondary js-menu-items-down" title="{{ 'Change position'|trans }}">
+                <i class="material-icons">keyboard_arrow_down</i>
+              </button>
+              <button type="button" class="btn btn-outline-secondary js-menu-items-remove">
+                {{ 'Remove'|trans }}
+                <i class="material-icons">arrow_forward</i>
+              </button>
+            </div>
+          </div>
+
+          <div class="col-lg-5">
+            <label class="form-control-label" for="ps-mainmenu-available">{{ 'Available items'|trans }}</label>
+            <select multiple id="ps-mainmenu-available" class="form-control js-menu-items-available" size="14">
+              {% for group, choices in availableItems %}
+                <optgroup label="{{ group }}">
+                  {% for value, label in choices %}
+                    <option value="{{ value }}"{% if selectedItems[value] is defined %} hidden{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </optgroup>
+              {% endfor %}
+            </select>
+            <div class="mt-2">
+              <button type="button" class="btn btn-outline-secondary js-menu-items-add">
+                <i class="material-icons">arrow_back</i>
+                {{ 'Add'|trans({}, 'Admin.Actions') }}
+              </button>
+            </div>
+          </div>
+
+          <div class="col-lg-2">
+            <label class="form-control-label" for="ps-mainmenu-product">{{ 'Indicate the ID number for the product'|trans }}</label>
+            <input type="number" min="1" step="1" id="ps-mainmenu-product" class="form-control js-menu-items-product"
+                   data-label="{{ 'Product ID #'|trans }}">
+            <div class="mt-2">
+              <button type="button" class="btn btn-outline-secondary js-menu-items-add-product">
+                <i class="material-icons">arrow_back</i>
+                {{ 'Add'|trans({}, 'Admin.Actions') }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="js-menu-items-values d-none">
+          {% for item in itemsForm.items %}
+            {{ form_widget(item) }}
+          {% endfor %}
+        </div>
+        {% do itemsForm.items.setRendered %}
+        {{ form_rest(itemsForm) }}
+      </div>
+      <div class="card-footer">
+        <div class="d-flex justify-content-end">
+          <button type="submit" class="btn btn-primary">{{ 'Save'|trans({}, 'Admin.Actions') }}</button>
+        </div>
+      </div>
+    </div>
+    {{ form_end(itemsForm) }}
+  {% endif %}
+
+  {% if linkGrid is not null %}
+    {% embed '@PrestaShop/Admin/Common/Grid/grid_panel.html.twig' with {'grid': linkGrid} %}
+      {% block grid_view_block %}
+        {# The list is short and shown whole: no pagination #}
+        {% embed '@PrestaShop/Admin/Common/Grid/grid.html.twig' with {'grid': grid} %}
+          {% block grid_footer_row %}{% endblock %}
+        {% endembed %}
+      {% endblock %}
+    {% endembed %}
+  {% endif %}
+{% endblock %}
+
+{% block javascripts %}
+  {{ parent() }}
+
+  <script src="{{ asset('../modules/ps_mainmenu/views/js/admin/configuration.js') }}"></script>
+{% endblock %}

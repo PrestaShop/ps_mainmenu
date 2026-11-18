@@ -5,7 +5,10 @@ parameters:
   paths:
     # From PHPStan 0.12, paths to check are relative to the neon file
     - ../../ps_mainmenu.php
-    - ../../ps_menutoplinks.class.php
+    - ../../src/
     - ../../translations/
+    - ../../upgrade/
     - ../../views/
   level: 5
+  parallel:
+    maximumNumberOfProcesses: 1

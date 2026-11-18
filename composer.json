@@ -10,19 +10,36 @@
     }
   ],
   "require": {
-    "php": ">=5.6.0"
+    "php": ">=8.1.0"
   },
   "require-dev": {
+      "phpunit/phpunit": "^10.5",
       "prestashop/php-dev-tools": "^4.3"
   },
   "config": {
     "preferred-install": "dist",
-    "prepend-autoloader": false
+    "classmap-authoritative": true,
+    "optimize-autoloader": true,
+    "prepend-autoloader": false,
+    "platform": {
+      "php": "8.1.0"
+    }
   },
   "type": "prestashop-module",
   "autoload": {
+    "psr-4": {
+      "PrestaShop\\Module\\MainMenu\\": "src/"
+    },
     "classmap": [
         "ps_mainmenu.php"
     ]
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit -c tests/Unit/phpunit.xml"
   }
 }
