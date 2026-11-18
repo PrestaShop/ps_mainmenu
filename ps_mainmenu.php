@@ -1134,7 +1134,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
             $path = $dir . DIRECTORY_SEPARATOR . $entry;
             if (is_dir($path)) {
                 $this->cleanMenuCacheDirectory($path);
-            } elseif (preg_match('/\.(json|tmp)$/', $entry)) {
+            } elseif (preg_match('/\.(json|html|tmp)$/', $entry)) {
                 @unlink($path);
             }
         }
@@ -1580,6 +1580,14 @@ class Ps_MainMenu extends Module implements WidgetInterface
 
     public function renderWidget($hookName, array $configuration)
     {
+        $cacheFile = $this->getRenderedMenuCacheFile();
+        if ($cacheFile !== null) {
+            $html = @file_get_contents($cacheFile);
+            if ($html !== false) {
+                return $html;
+            }
+        }
+
         $menu = $this->getWidgetVariables($hookName, $configuration);
 
         Hook::exec('actionMainMenuModifier', ['menu' => &$menu]);
@@ -1588,7 +1596,67 @@ class Ps_MainMenu extends Module implements WidgetInterface
             'menu' => $menu,
         ]);
 
-        return $this->fetch('module:ps_mainmenu/ps_mainmenu.tpl');
+        $html = $this->fetch('module:ps_mainmenu/ps_mainmenu.tpl');
+        if ($cacheFile !== null) {
+            $this->writeFile($cacheFile, $html);
+        }
+
+        return $html;
+    }
+
+    /**
+     * The markup is the same on every page which is not in the menu, so it is stored once for all of them.
+     * It follows the Smarty cache setting of the shop, and is not used when a module alters the menu.
+     *
+     * @return string|null Null when the menu must be rendered
+     */
+    private function getRenderedMenuCacheFile()
+    {
+        if (!Configuration::get('PS_SMARTY_CACHE')
+            || (int) Configuration::get('PS_SMARTY_FORCE_COMPILE') === _PS_SMARTY_FORCE_COMPILE_
+            || Hook::getHookModuleExecList('actionMainMenuModifier')
+        ) {
+            return null;
+        }
+
+        $template = $this->getTemplatePath('ps_mainmenu.tpl');
+        if ($template === null) {
+            return null;
+        }
+
+        $pageIdentifiers = $this->getMenuPageIdentifiers();
+        if (isset($pageIdentifiers[$this->getCurrentPageIdentifier()])) {
+            return null;
+        }
+
+        // A change of theme or of template gives another file
+        return $this->getMenuCacheFile('_' . md5($template . @filemtime($template)) . '.html');
+    }
+
+    /**
+     * @return array<string, bool> Identifiers of the pages of the menu, as keys
+     */
+    private function getMenuPageIdentifiers()
+    {
+        $cacheFile = $this->getMenuCacheFile('_pages.json');
+        $pageIdentifiers = $this->readCacheFile($cacheFile);
+        if ($pageIdentifiers === null) {
+            $pageIdentifiers = [];
+            $this->collectPageIdentifiers($this->getMenu(), $pageIdentifiers);
+            $this->writeCacheFile($cacheFile, $pageIdentifiers);
+        }
+
+        return $pageIdentifiers;
+    }
+
+    private function collectPageIdentifiers(array $node, array &$identifiers)
+    {
+        if ($node['page_identifier'] !== null) {
+            $identifiers[$node['page_identifier']] = true;
+        }
+        foreach ($node['children'] as $child) {
+            $this->collectPageIdentifiers($child, $identifiers);
+        }
     }
 
     private function getMenu()
@@ -1603,14 +1671,14 @@ class Ps_MainMenu extends Module implements WidgetInterface
         return $menu;
     }
 
-    private function getMenuCacheFile()
+    private function getMenuCacheFile($suffix = '.json')
     {
         $this->user_groups = Customer::getGroupsStatic($this->context->customer->id);
         $groupsKey = empty($this->user_groups) ? '' : '_' . join('_', $this->user_groups);
         $version = preg_replace('/[^a-z0-9]/i', '', (string) Configuration::getGlobalValue(self::MENU_CACHE_VERSION_KEY));
 
         return $this->getCacheDirectory() . DIRECTORY_SEPARATOR . self::MENU_JSON_CACHE_KEY
-            . '_' . (int) $this->context->language->id . '_' . (int) $this->context->shop->id . $groupsKey . '_v' . $version . '.json';
+            . '_' . (int) $this->context->language->id . '_' . (int) $this->context->shop->id . $groupsKey . '_v' . $version . $suffix;
     }
 
     private function readCacheFile($file)
@@ -1622,9 +1690,14 @@ class Ps_MainMenu extends Module implements WidgetInterface
 
     private function writeCacheFile($file, array $data)
     {
+        $this->writeFile($file, json_encode($data));
+    }
+
+    private function writeFile($file, $content)
+    {
         // Written aside then renamed, so that a concurrent request never reads a partial file
         $temporaryFile = $file . uniqid('.', true) . '.tmp';
-        if (@file_put_contents($temporaryFile, json_encode($data)) === false || !@rename($temporaryFile, $file)) {
+        if (@file_put_contents($temporaryFile, $content) === false || !@rename($temporaryFile, $file)) {
             @unlink($temporaryFile);
         }
     }
