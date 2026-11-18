@@ -20,14 +20,14 @@
 
 declare(strict_types=1);
 
-namespace PrestaShop\Module\Mainmenu\Install;
+namespace PrestaShop\Module\MainMenu\Install;
 
 use Configuration;
 use Db;
 use Module;
-use PrestaShop\Module\Mainmenu\Cache\MenuCache;
-use PrestaShop\Module\Mainmenu\Menu\MenuConfiguration;
-use PrestaShop\Module\Mainmenu\Repository\LinkRepository;
+use PrestaShop\Module\MainMenu\Cache\MenuCache;
+use PrestaShop\Module\MainMenu\Menu\MenuConfiguration;
+use PrestaShop\Module\MainMenu\Repository\LinkRepository;
 
 final class Installer
 {

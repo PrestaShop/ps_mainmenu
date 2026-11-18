@@ -3,7 +3,7 @@ set -e
 
 if [ $# -le 0 ]; then
   echo "No version provided. Use:"
-  echo "tests/phpstan/phpstan.sh [PrestaShop_version]"
+  echo "tests/phpstan.sh [PrestaShop_version] [PHP_version]"
   exit 1
 fi
 

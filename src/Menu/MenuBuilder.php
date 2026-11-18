@@ -20,7 +20,7 @@
 
 declare(strict_types=1);
 
-namespace PrestaShop\Module\Mainmenu\Menu;
+namespace PrestaShop\Module\MainMenu\Menu;
 
 use Category;
 use CMS;
@@ -28,8 +28,8 @@ use CMSCategory;
 use Configuration;
 use Context;
 use Manufacturer;
-use PrestaShop\Module\Mainmenu\Repository\CmsRepository;
-use PrestaShop\Module\Mainmenu\Repository\LinkRepository;
+use PrestaShop\Module\MainMenu\Repository\CmsRepository;
+use PrestaShop\Module\MainMenu\Repository\LinkRepository;
 use Product;
 use Shop;
 use Supplier;

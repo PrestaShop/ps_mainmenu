@@ -20,7 +20,7 @@
 
 declare(strict_types=1);
 
-namespace PrestaShop\Module\Mainmenu\Repository;
+namespace PrestaShop\Module\MainMenu\Repository;
 
 use Db;
 use DbQuery;

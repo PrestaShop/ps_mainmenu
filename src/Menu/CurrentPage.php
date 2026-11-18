@@ -20,7 +20,7 @@
 
 declare(strict_types=1);
 
-namespace PrestaShop\Module\Mainmenu\Menu;
+namespace PrestaShop\Module\MainMenu\Menu;
 
 use Context;
 use Dispatcher;

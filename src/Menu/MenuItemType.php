@@ -20,7 +20,7 @@
 
 declare(strict_types=1);
 
-namespace PrestaShop\Module\Mainmenu\Menu;
+namespace PrestaShop\Module\MainMenu\Menu;
 
 /*
  * Prefix of a menu item in the MOD_BLOCKTOPMENU_ITEMS configuration, e.g. "CAT" in "CAT12".

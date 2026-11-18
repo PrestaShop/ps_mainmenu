@@ -20,7 +20,7 @@
 
 declare(strict_types=1);
 
-namespace PrestaShop\Module\Mainmenu\Cache;
+namespace PrestaShop\Module\MainMenu\Cache;
 
 use Configuration;
 use FilesystemIterator;

@@ -31,19 +31,19 @@ if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once __DIR__ . '/vendor/autoload.php';
 }
 
-use PrestaShop\Module\Mainmenu\Cache\MenuCache;
-use PrestaShop\Module\Mainmenu\Install\Installer;
-use PrestaShop\Module\Mainmenu\Menu\CachedMenu;
-use PrestaShop\Module\Mainmenu\Menu\CategoryThumbnails;
-use PrestaShop\Module\Mainmenu\Menu\CurrentPage;
-use PrestaShop\Module\Mainmenu\Menu\MenuBuilder;
-use PrestaShop\Module\Mainmenu\Menu\MenuConfiguration;
-use PrestaShop\Module\Mainmenu\Menu\MenuItem;
-use PrestaShop\Module\Mainmenu\Menu\MenuItemType;
-use PrestaShop\Module\Mainmenu\Menu\MenuTree;
-use PrestaShop\Module\Mainmenu\Repository\CategoryRepository;
-use PrestaShop\Module\Mainmenu\Repository\CmsRepository;
-use PrestaShop\Module\Mainmenu\Repository\LinkRepository;
+use PrestaShop\Module\MainMenu\Cache\MenuCache;
+use PrestaShop\Module\MainMenu\Install\Installer;
+use PrestaShop\Module\MainMenu\Menu\CachedMenu;
+use PrestaShop\Module\MainMenu\Menu\CategoryThumbnails;
+use PrestaShop\Module\MainMenu\Menu\CurrentPage;
+use PrestaShop\Module\MainMenu\Menu\MenuBuilder;
+use PrestaShop\Module\MainMenu\Menu\MenuConfiguration;
+use PrestaShop\Module\MainMenu\Menu\MenuItem;
+use PrestaShop\Module\MainMenu\Menu\MenuItemType;
+use PrestaShop\Module\MainMenu\Menu\MenuTree;
+use PrestaShop\Module\MainMenu\Repository\CategoryRepository;
+use PrestaShop\Module\MainMenu\Repository\CmsRepository;
+use PrestaShop\Module\MainMenu\Repository\LinkRepository;
 use PrestaShop\PrestaShop\Core\Module\WidgetInterface;
 
 class Ps_MainMenu extends Module implements WidgetInterface
@@ -75,11 +75,6 @@ class Ps_MainMenu extends Module implements WidgetInterface
         $this->displayName = $this->trans('Main menu', [], 'Modules.Mainmenu.Admin');
         $this->description = $this->trans('Make it easy for your visitors to find their way on your store, select the right link and turn it into a menu item.', [], 'Modules.Mainmenu.Admin');
         $this->ps_versions_compliancy = ['min' => '9.0.0', 'max' => _PS_VERSION_];
-    }
-
-    public function isUsingNewTranslationSystem(): bool
-    {
-        return true;
     }
 
     public function install(): bool
@@ -296,7 +291,6 @@ class Ps_MainMenu extends Module implements WidgetInterface
 
     private function clearMenuCache(): void
     {
-        $this->getMenuConfiguration()->forgetItemsOfAllShops();
         $this->getMenuCache()->clear();
     }
 

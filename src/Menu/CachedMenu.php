@@ -20,11 +20,11 @@
 
 declare(strict_types=1);
 
-namespace PrestaShop\Module\Mainmenu\Menu;
+namespace PrestaShop\Module\MainMenu\Menu;
 
 use Context;
 use Customer;
-use PrestaShop\Module\Mainmenu\Cache\MenuCache;
+use PrestaShop\Module\MainMenu\Cache\MenuCache;
 
 /**
  * The menu of the current language, shop and customer groups, built once then read from the cache.

@@ -20,7 +20,7 @@
 
 declare(strict_types=1);
 
-namespace PrestaShop\Module\Mainmenu\Menu;
+namespace PrestaShop\Module\MainMenu\Menu;
 
 /**
  * Operations on the menu tree. Nodes stay plain arrays: theme templates read them as such.

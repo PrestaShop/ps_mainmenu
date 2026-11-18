@@ -20,7 +20,7 @@
 
 declare(strict_types=1);
 
-namespace PrestaShop\Module\Mainmenu\Menu;
+namespace PrestaShop\Module\MainMenu\Menu;
 
 final class MenuItem
 {
@@ -30,9 +30,12 @@ final class MenuItem
     ) {
     }
 
+    /**
+     * Whatever follows the identifier is ignored, as menus saved by the previous versions can hold such values.
+     */
     public static function fromString(string $item): ?self
     {
-        if (preg_match('/^([A-Z_]+)([0-9]+)$/', $item, $matches) !== 1) {
+        if (preg_match('/^([A-Z_]+)([0-9]+)/', trim($item), $matches) !== 1) {
             return null;
         }
 

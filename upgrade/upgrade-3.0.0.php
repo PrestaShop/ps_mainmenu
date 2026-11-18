@@ -22,8 +22,9 @@ if (!defined('_PS_VERSION_')) {
 }
 
 /**
- * This script can run while the class of the previous version is the one loaded in memory:
- * it only relies on the module directory and on the Module API of the core.
+ * This script can run while the class of the previous version is the one loaded in memory, and the
+ * autoloader of the module was registered before the new files were extracted: no class of src/ can
+ * be used here. It only relies on the module directory and on the Module API of the core.
  *
  * @param Module $module
  *

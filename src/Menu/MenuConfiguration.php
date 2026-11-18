@@ -20,7 +20,7 @@
 
 declare(strict_types=1);
 
-namespace PrestaShop\Module\Mainmenu\Menu;
+namespace PrestaShop\Module\MainMenu\Menu;
 
 use Configuration;
 use Db;
@@ -54,18 +54,54 @@ final class MenuConfiguration
     }
 
     /**
-     * @param string[] $items
+     * @param string[] $items Values which are not menu items are left out
      */
     public function saveItems(array $items, int $idShop): bool
     {
-        return Configuration::updateValue(self::ITEMS_KEY, implode(',', $items), false, (int) Shop::getGroupFromShop($idShop), $idShop);
+        $this->itemsOfAllShops = null;
+
+        return Configuration::updateValue(
+            self::ITEMS_KEY,
+            implode(',', self::normalize($items)),
+            false,
+            (int) Shop::getGroupFromShop($idShop),
+            $idShop
+        );
+    }
+
+    /**
+     * @param array<mixed> $items
+     *
+     * @return string[] Valid items, in their canonical form
+     */
+    public static function normalize(array $items): array
+    {
+        $normalized = [];
+        foreach ($items as $item) {
+            $menuItem = is_scalar($item) ? MenuItem::fromString((string) $item) : null;
+            if ($menuItem !== null) {
+                $normalized[] = (string) $menuItem;
+            }
+        }
+
+        return $normalized;
     }
 
     public function removeItem(MenuItem $item, int $idShop): void
     {
         $idShopGroup = (int) Shop::getGroupFromShop($idShop);
         $items = $this->split((string) Configuration::get(self::ITEMS_KEY, null, $idShopGroup, $idShop));
-        $this->saveItems(array_values(array_diff($items, [(string) $item])), $idShop);
+        $this->saveItems(self::without($items, $item), $idShop);
+    }
+
+    /**
+     * @param string[] $items
+     *
+     * @return string[] The items but this one: removing LNK1 leaves LNK12 untouched
+     */
+    public static function without(array $items, MenuItem $item): array
+    {
+        return array_values(array_diff(self::normalize($items), [(string) $item]));
     }
 
     /**
@@ -88,11 +124,6 @@ final class MenuConfiguration
         }
 
         return false;
-    }
-
-    public function forgetItemsOfAllShops(): void
-    {
-        $this->itemsOfAllShops = null;
     }
 
     /**
