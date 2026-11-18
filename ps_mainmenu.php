@@ -1620,7 +1620,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
         }
 
         $template = $this->getTemplatePath('ps_mainmenu.tpl');
-        if ($template === null) {
+        if (!$template) {
             return null;
         }
 
