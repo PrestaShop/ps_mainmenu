@@ -68,7 +68,7 @@
               {% for group, choices in availableItems %}
                 <optgroup label="{{ group }}">
                   {% for value, label in choices %}
-                    <option value="{{ value }}">{{ label }}</option>
+                    <option value="{{ value }}"{% if selectedItems[value] is defined %} hidden{% endif %}>{{ label }}</option>
                   {% endfor %}
                 </optgroup>
               {% endfor %}
@@ -111,7 +111,16 @@
     {{ form_end(itemsForm) }}
   {% endif %}
 
-  {{ include('@PrestaShop/Admin/Common/Grid/grid_panel.html.twig', {'grid': linkGrid}) }}
+  {% if linkGrid is not null %}
+    {% embed '@PrestaShop/Admin/Common/Grid/grid_panel.html.twig' with {'grid': linkGrid} %}
+      {% block grid_view_block %}
+        {# The list is short and shown whole: no pagination #}
+        {% embed '@PrestaShop/Admin/Common/Grid/grid.html.twig' with {'grid': grid} %}
+          {% block grid_footer_row %}{% endblock %}
+        {% endembed %}
+      {% endblock %}
+    {% endembed %}
+  {% endif %}
 {% endblock %}
 
 {% block javascripts %}

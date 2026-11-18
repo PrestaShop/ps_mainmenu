@@ -129,11 +129,13 @@ class ConfigurationController extends PrestaShopAdminController
 
         if ($form->isSubmitted() && $form->isValid()) {
             $data = $form->getData();
-            $linkRepository->update($linkId, $this->toStrings($data['link']), $this->toStrings($data['label']), (bool) $data['new_window'], $idShop);
-            $menuCache->clear();
-            $this->addFlash('success', $this->trans('The link has been edited.', [], 'Modules.Mainmenu.Admin'));
+            if ($linkRepository->update($linkId, $this->toStrings($data['link']), $this->toStrings($data['label']), (bool) $data['new_window'], $idShop)) {
+                $menuCache->clear();
+                $this->addFlash('success', $this->trans('The link has been edited.', [], 'Modules.Mainmenu.Admin'));
 
-            return $this->redirectToRoute(self::INDEX_ROUTE);
+                return $this->redirectToRoute(self::INDEX_ROUTE);
+            }
+            $this->addFlash('error', $this->trans('An error occurred while updating an object.', [], 'Admin.Notifications.Error'));
         }
 
         return $this->renderLinkForm($request, $form, $this->trans('Update link', [], 'Modules.Mainmenu.Admin'));
@@ -169,14 +171,24 @@ class ConfigurationController extends PrestaShopAdminController
         GridFactoryInterface $linkGridFactory,
     ): Response {
         $shopContext = $this->getShopContext();
-        $items = MenuConfiguration::normalize($itemsForm->getData()['items'] ?? []);
-        $linkGrid = $linkGridFactory->getGrid(new LinkFilters($this->getLanguageContext()->getId(), $shopContext->getId()));
+        $selectedItems = [];
+        $availableItems = [];
+        $linkGrid = null;
+
+        // The menu and its links belong to one shop: nothing is listed from the "All shops" or a shop group context
+        if ($shopContext->isSingleShopContext()) {
+            $idLang = $this->getLanguageContext()->getId();
+            $choices = $menuItemChoices->forShop($shopContext->getId(), $idLang, (int) $this->getConfiguration()->get('PS_LANG_DEFAULT'));
+            $selectedItems = $choices->getSelected(MenuConfiguration::normalize($itemsForm->getData()['items'] ?? []));
+            $availableItems = $choices->getAvailable();
+            $linkGrid = $this->presentGrid($linkGridFactory->getGrid(new LinkFilters($idLang, $shopContext->getId())));
+        }
 
         return $this->render('@Modules/ps_mainmenu/views/templates/admin/configuration.html.twig', [
             'itemsForm' => $itemsForm->createView(),
-            'selectedItems' => $menuItemChoices->getSelected($items),
-            'availableItems' => $menuItemChoices->getAvailable($items),
-            'linkGrid' => $this->presentGrid($linkGrid),
+            'selectedItems' => $selectedItems,
+            'availableItems' => $availableItems,
+            'linkGrid' => $linkGrid,
             'isSingleShopContext' => $shopContext->isSingleShopContext(),
             'shopName' => $shopContext->getName(),
             'isMultiShopUsed' => $shopContext->isMultiShopUsed(),

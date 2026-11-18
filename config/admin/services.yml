@@ -35,9 +35,6 @@ services:
   PrestaShop\Module\MainMenu\Form\MenuItemChoices:
     arguments:
       $translator: '@translator'
-      $idLang: '@=service("prestashop.adapter.legacy.context").getLanguage().id'
-      $idDefaultLang: '@=service("prestashop.adapter.legacy.configuration").getInt("PS_LANG_DEFAULT")'
-      $idShop: '@=service("prestashop.adapter.shop.context").getContextShopID()'
 
   PrestaShop\Module\MainMenu\Form\Type\LinkType:
     parent: 'form.type.translatable.aware'

@@ -125,9 +125,9 @@ final class LinkRepository
      * @param array<int, string> $links URL of each language
      * @param array<int, string> $labels Label of each language
      */
-    public function update(int $idLink, array $links, array $labels, bool $newWindow, int $idShop): void
+    public function update(int $idLink, array $links, array $labels, bool $newWindow, int $idShop): bool
     {
-        $this->db->update(
+        $result = $this->db->update(
             'linksmenutop',
             ['new_window' => (int) $newWindow, 'id_shop' => $idShop],
             '`id_linksmenutop` = ' . $idLink
@@ -135,20 +135,35 @@ final class LinkRepository
 
         // Rows are replaced rather than updated: a language added after the link was created has no row yet
         foreach ($labels as $idLang => $label) {
-            $this->db->delete('linksmenutop_lang', '`id_linksmenutop` = ' . $idLink . ' AND `id_lang` = ' . (int) $idLang);
-            $this->db->insert('linksmenutop_lang', [
-                'id_linksmenutop' => $idLink,
-                'id_lang' => (int) $idLang,
-                'id_shop' => $idShop,
-                'label' => pSQL((string) $label),
-                'link' => pSQL((string) ($links[$idLang] ?? '')),
-            ]);
+            $result = $this->db->delete('linksmenutop_lang', '`id_linksmenutop` = ' . $idLink . ' AND `id_lang` = ' . (int) $idLang)
+                && $this->db->insert('linksmenutop_lang', [
+                    'id_linksmenutop' => $idLink,
+                    'id_lang' => (int) $idLang,
+                    'id_shop' => $idShop,
+                    'label' => pSQL((string) $label),
+                    'link' => pSQL((string) ($links[$idLang] ?? '')),
+                ])
+                && $result;
         }
+
+        return $result;
     }
 
+    /**
+     * @return bool False when the link is not one of this shop
+     */
     public function delete(int $idLink, int $idShop): bool
     {
-        return $this->db->delete('linksmenutop', '`id_linksmenutop` = ' . $idLink . ' AND `id_shop` = ' . $idShop)
+        $isLinkOfShop = (bool) $this->db->getValue(
+            (new DbQuery())
+                ->select('1')
+                ->from('linksmenutop')
+                ->where('`id_linksmenutop` = ' . $idLink)
+                ->where('`id_shop` = ' . $idShop)
+        );
+
+        return $isLinkOfShop
+            && $this->db->delete('linksmenutop', '`id_linksmenutop` = ' . $idLink . ' AND `id_shop` = ' . $idShop)
             && $this->db->delete('linksmenutop_lang', '`id_linksmenutop` = ' . $idLink);
     }
 

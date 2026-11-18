@@ -69,7 +69,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
 
         $tabNames = [];
         foreach (Language::getLanguages(true) as $lang) {
-            $tabNames[$lang['locale']] = $this->trans('Menu', [], 'Modules.Mainmenu.Admin', $lang['locale']);
+            $tabNames[$lang['locale']] = $this->trans('Menu', [], 'Admin.Navigation.Menu', $lang['locale']);
         }
         $this->tabs = [
             [
@@ -79,7 +79,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
                 'name' => $tabNames,
                 'parent_class_name' => 'AdminParentThemes',
                 'wording' => 'Menu',
-                'wording_domain' => 'Modules.Mainmenu.Admin',
+                'wording_domain' => 'Admin.Navigation.Menu',
             ],
         ];
 

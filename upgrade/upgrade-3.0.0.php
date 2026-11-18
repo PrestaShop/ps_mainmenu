@@ -67,12 +67,13 @@ function ps_mainmenu_3_0_0_install_tab()
     $tab->route_name = 'ps_mainmenu_configuration';
     $tab->module = 'ps_mainmenu';
     $tab->active = true;
-    $tab->enabled = true;
+    $tab->enabled = (bool) Module::isEnabled('ps_mainmenu');
     $tab->id_parent = (int) Tab::getIdFromClassName('AdminParentThemes');
     $tab->wording = 'Menu';
-    $tab->wording_domain = 'Modules.Mainmenu.Admin';
+    $tab->wording_domain = 'Admin.Navigation.Menu';
+    $translator = Context::getContext()->getTranslator();
     foreach (Language::getLanguages(false) as $language) {
-        $tab->name[(int) $language['id_lang']] = 'Menu';
+        $tab->name[(int) $language['id_lang']] = $translator->trans('Menu', [], 'Admin.Navigation.Menu', $language['locale']);
     }
 
     return (bool) $tab->add();

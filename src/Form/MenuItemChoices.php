@@ -44,15 +44,29 @@ final class MenuItemChoices
 {
     private const INDENTATION = "\u{00A0}\u{00A0}\u{00A0}\u{00A0}\u{00A0}";
 
+    private int $idLang = 0;
+    private int $idDefaultLang = 0;
+    private int $idShop = 0;
+
     public function __construct(
         private readonly LinkRepository $linkRepository,
         private readonly CmsRepository $cmsRepository,
         private readonly CategoryRepository $categoryRepository,
         private readonly TranslatorInterface $translator,
-        private readonly int $idLang,
-        private readonly int $idDefaultLang,
-        private readonly int $idShop,
     ) {
+    }
+
+    /**
+     * The menu belongs to one shop: the choices are those of this shop, labelled in this language.
+     */
+    public function forShop(int $idShop, int $idLang, int $idDefaultLang): self
+    {
+        $choices = clone $this;
+        $choices->idShop = $idShop;
+        $choices->idLang = $idLang;
+        $choices->idDefaultLang = $idDefaultLang;
+
+        return $choices;
     }
 
     /**
@@ -75,11 +89,9 @@ final class MenuItemChoices
     }
 
     /**
-     * @param string[] $selectedItems Items of the menu, which are not offered again
-     *
      * @return array<string, array<string, string>> Labels by item, by group
      */
-    public function getAvailable(array $selectedItems): array
+    public function getAvailable(): array
     {
         $groups = [
             $this->trans('CMS') => $this->getCmsChoices(0, 1),
@@ -91,10 +103,6 @@ final class MenuItemChoices
             $groups[$this->trans('Shops')] = $this->getShopChoices();
         }
         $groups[$this->trans('Menu Top Links')] = $this->getLinkChoices();
-
-        foreach ($groups as $label => $choices) {
-            $groups[$label] = array_diff_key($choices, array_flip($selectedItems));
-        }
 
         return $groups;
     }
