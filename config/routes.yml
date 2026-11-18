@@ -1,0 +1,39 @@
+ps_mainmenu_configuration:
+  path: /ps_mainmenu/configuration
+  methods: [GET]
+  defaults:
+    _controller: 'PrestaShop\Module\MainMenu\Controller\Admin\ConfigurationController::indexAction'
+    _legacy_controller: AdminPsMainMenu
+    _legacy_link: AdminPsMainMenu
+
+ps_mainmenu_configuration_save:
+  path: /ps_mainmenu/configuration
+  methods: [POST]
+  defaults:
+    _controller: 'PrestaShop\Module\MainMenu\Controller\Admin\ConfigurationController::saveItemsAction'
+    _legacy_controller: AdminPsMainMenu
+
+ps_mainmenu_link_create:
+  path: /ps_mainmenu/links/new
+  methods: [GET, POST]
+  defaults:
+    _controller: 'PrestaShop\Module\MainMenu\Controller\Admin\ConfigurationController::createLinkAction'
+    _legacy_controller: AdminPsMainMenu
+
+ps_mainmenu_link_edit:
+  path: /ps_mainmenu/links/{linkId}/edit
+  methods: [GET, POST]
+  defaults:
+    _controller: 'PrestaShop\Module\MainMenu\Controller\Admin\ConfigurationController::editLinkAction'
+    _legacy_controller: AdminPsMainMenu
+  requirements:
+    linkId: \d+
+
+ps_mainmenu_link_delete:
+  path: /ps_mainmenu/links/{linkId}/delete
+  methods: [POST]
+  defaults:
+    _controller: 'PrestaShop\Module\MainMenu\Controller\Admin\ConfigurationController::deleteLinkAction'
+    _legacy_controller: AdminPsMainMenu
+  requirements:
+    linkId: \d+

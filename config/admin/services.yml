@@ -1,0 +1,71 @@
+# Back office only. The front office builds its classes itself (see Ps_MainMenu),
+# so that nothing of this module has to compile in the front office container.
+services:
+  _defaults:
+    public: false
+    autowire: true
+    autoconfigure: true
+
+  PrestaShop\Module\MainMenu\Controller\Admin\ConfigurationController: ~
+
+  ps_mainmenu.db:
+    class: Db
+    factory: ['Db', 'getInstance']
+
+  PrestaShop\Module\MainMenu\Repository\LinkRepository:
+    arguments:
+      $db: '@ps_mainmenu.db'
+
+  PrestaShop\Module\MainMenu\Repository\CmsRepository:
+    arguments:
+      $db: '@ps_mainmenu.db'
+
+  PrestaShop\Module\MainMenu\Repository\CategoryRepository:
+    arguments:
+      $db: '@ps_mainmenu.db'
+
+  PrestaShop\Module\MainMenu\Menu\MenuConfiguration:
+    arguments:
+      $db: '@ps_mainmenu.db'
+
+  PrestaShop\Module\MainMenu\Cache\MenuCache:
+    arguments:
+      $directory: '@=constant("_PS_CACHE_DIR_") ~ "ps_mainmenu"'
+
+  PrestaShop\Module\MainMenu\Form\MenuItemChoices:
+    arguments:
+      $translator: '@translator'
+      $idLang: '@=service("prestashop.adapter.legacy.context").getLanguage().id'
+      $idDefaultLang: '@=service("prestashop.adapter.legacy.configuration").getInt("PS_LANG_DEFAULT")'
+      $idShop: '@=service("prestashop.adapter.shop.context").getContextShopID()'
+
+  PrestaShop\Module\MainMenu\Form\Type\LinkType:
+    parent: 'form.type.translatable.aware'
+    tags:
+      - { name: form.type }
+
+  ps_mainmenu.grid.link_definition_factory:
+    class: PrestaShop\Module\MainMenu\Grid\LinkGridDefinitionFactory
+    parent: 'prestashop.core.grid.definition.factory.abstract_grid_definition'
+
+  ps_mainmenu.grid.link_query_builder:
+    class: PrestaShop\Module\MainMenu\Grid\LinkQueryBuilder
+    arguments:
+      $connection: '@doctrine.dbal.default_connection'
+      $dbPrefix: '%database_prefix%'
+
+  ps_mainmenu.grid.link_data_factory:
+    class: '%prestashop.core.grid.data.factory.doctrine_grid_data_factory%'
+    arguments:
+      $gridQueryBuilder: '@ps_mainmenu.grid.link_query_builder'
+      $hookDispatcher: '@prestashop.core.hook.dispatcher'
+      $queryParser: '@prestashop.core.grid.query.doctrine_query_parser'
+      $gridId: 'ps_mainmenu_link'
+
+  ps_mainmenu.grid.link_grid_factory:
+    class: PrestaShop\PrestaShop\Core\Grid\GridFactory
+    arguments:
+      $definitionFactory: '@ps_mainmenu.grid.link_definition_factory'
+      $dataFactory: '@ps_mainmenu.grid.link_data_factory'
+      $filterFormFactory: '@PrestaShop\PrestaShop\Core\Grid\Filter\GridFilterFormFactory'
+      $hookDispatcher: '@prestashop.core.hook.dispatcher'

@@ -24,7 +24,6 @@ namespace PrestaShop\Module\MainMenu\Repository;
 
 use Db;
 use DbQuery;
-use Tools;
 
 /**
  * Custom links of the menu (tables linksmenutop and linksmenutop_lang).
@@ -69,9 +68,9 @@ final class LinkRepository
     }
 
     /**
-     * @return array{link: array<int, string>, label: array<int, string>, new_window: bool} Values of each language, escaped for the edition form
+     * @return array{link: array<int, string>, label: array<int, string>, new_window: bool}|null Values of each language, null when the link does not exist
      */
-    public function getTranslations(int $idLink, int $idShop): array
+    public function getTranslations(int $idLink, int $idShop): ?array
     {
         $query = (new DbQuery())
             ->select('l.`new_window`, ll.`link`, ll.`label`, ll.`id_lang`')
@@ -80,10 +79,17 @@ final class LinkRepository
             ->where('l.`id_linksmenutop` = ' . $idLink)
             ->where('l.`id_shop` IN (0, ' . $idShop . ')');
 
+        $rows = $this->db->executeS($query) ?: [];
+        if (!$rows) {
+            return null;
+        }
+
         $translations = ['link' => [], 'label' => [], 'new_window' => false];
-        foreach ($this->db->executeS($query) ?: [] as $row) {
-            $translations['link'][(int) $row['id_lang']] = Tools::safeOutput($row['link']);
-            $translations['label'][(int) $row['id_lang']] = Tools::safeOutput($row['label']);
+        foreach ($rows as $row) {
+            if ($row['id_lang'] !== null) {
+                $translations['link'][(int) $row['id_lang']] = (string) $row['link'];
+                $translations['label'][(int) $row['id_lang']] = (string) $row['label'];
+            }
             $translations['new_window'] = (bool) $row['new_window'];
         }
 
@@ -127,12 +133,16 @@ final class LinkRepository
             '`id_linksmenutop` = ' . $idLink
         );
 
+        // Rows are replaced rather than updated: a language added after the link was created has no row yet
         foreach ($labels as $idLang => $label) {
-            $this->db->update(
-                'linksmenutop_lang',
-                ['id_shop' => $idShop, 'label' => pSQL($label), 'link' => pSQL($links[$idLang] ?? '')],
-                '`id_linksmenutop` = ' . $idLink . ' AND `id_lang` = ' . (int) $idLang
-            );
+            $this->db->delete('linksmenutop_lang', '`id_linksmenutop` = ' . $idLink . ' AND `id_lang` = ' . (int) $idLang);
+            $this->db->insert('linksmenutop_lang', [
+                'id_linksmenutop' => $idLink,
+                'id_lang' => (int) $idLang,
+                'id_shop' => $idShop,
+                'label' => pSQL((string) $label),
+                'link' => pSQL((string) ($links[$idLang] ?? '')),
+            ]);
         }
     }
 
