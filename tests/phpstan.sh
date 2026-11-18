@@ -3,6 +3,12 @@ PS_VERSION=$1
 
 set -e
 
+# PrestaShop 9 (the "latest" image) requires PHP 8.1, the PHPStan 0.12 image runs PHP 7.4
+PHPSTAN_IMAGE=phpstan/phpstan:0.12
+if [ "$PS_VERSION" = "latest" ]; then
+  PHPSTAN_IMAGE=ghcr.io/phpstan/phpstan:1-php8.1
+fi
+
 # Docker images prestashop/prestashop may be used, even if the shop remains uninstalled
 echo "Pull PrestaShop files (Tag ${PS_VERSION})"
 
@@ -23,6 +29,6 @@ echo "Run PHPStan using phpstan-${PS_VERSION}.neon file"
 docker run --rm --volumes-from temp-ps \
        -v $PWD:/var/www/html/modules/ps_mainmenu \
        -e _PS_ROOT_DIR_=/var/www/html \
-       --workdir=/var/www/html/modules/ps_mainmenu phpstan/phpstan:0.12 \
+       --workdir=/var/www/html/modules/ps_mainmenu $PHPSTAN_IMAGE \
        analyse \
        --configuration=/var/www/html/modules/ps_mainmenu/tests/phpstan/phpstan-$PS_VERSION.neon
