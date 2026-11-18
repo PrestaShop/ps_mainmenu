@@ -3,29 +3,20 @@ on: [push, pull_request]
 jobs:
   # Check there is no syntax errors in the project
   php-linter:
-    name: PHP Syntax check 5.6 => 8.1
+    name: PHP Syntax check 8.1 => 8.3
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3.1.0
 
-      - name: PHP syntax checker 5.6
-        uses: prestashop/github-action-php-lint/5.6@master
-
-      - name: PHP syntax checker 7.2
-        uses: prestashop/github-action-php-lint/7.2@master
-
-      - name: PHP syntax checker 7.3
-        uses: prestashop/github-action-php-lint/7.3@master
-
-      - name: PHP syntax checker 7.4
-        uses: prestashop/github-action-php-lint/7.4@master
-
-      - name: PHP syntax checker 8.0
-        uses: prestashop/github-action-php-lint/8.0@master
-
       - name: PHP syntax checker 8.1
         uses: prestashop/github-action-php-lint/8.1@master
+
+      - name: PHP syntax checker 8.2
+        uses: prestashop/github-action-php-lint/8.2@master
+
+      - name: PHP syntax checker 8.3
+        uses: prestashop/github-action-php-lint/8.3@master
 
   # Check the PHP code follow the coding standards
   php-cs-fixer:
@@ -35,7 +26,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '7.4'
+          php-version: '8.1'
 
       - name: Checkout
         uses: actions/checkout@v3.1.0
@@ -58,12 +49,15 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        presta-versions: ['1.7.1.2', '1.7.2.5', '1.7.3.4', '1.7.4.4', '1.7.5.1', '1.7.6', '1.7.7', '1.7.8', 'latest']
+        presta-version: [ 'nightly', '9.0.x' ]
+        # The 8.4 compatibility is not available yet, this should be uncommented whe the dockers are ready
+        # php-version: [ '8.1', '8.2', '8.3', '8.4' ]
+        php-version: [ '8.1', '8.2', '8.3' ]
     steps:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '7.4'
+          php-version: ${{ matrix.php-version }})
 
       - name: Checkout
         uses: actions/checkout@v3.1.0
@@ -85,5 +79,5 @@ jobs:
       - run: composer install
 
       # Docker images prestashop/prestashop may be used, even if the shop remains uninstalled
-      - name: Execute PHPStan on PrestaShop (Tag ${{ matrix.presta-versions }})
-        run: ./tests/phpstan.sh ${{ matrix.presta-versions }}
+      - name: Execute PHPStan on PrestaShop (Tag ${{ matrix.presta-version }}-${{ matrix.php-version }}))
+        run: ./tests/phpstan.sh ${{ matrix.presta-version }} ${{ matrix.php-version }}

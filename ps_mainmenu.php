@@ -27,189 +27,323 @@ if (!defined('_PS_VERSION_')) {
     exit;
 }
 
-use PrestaShop\PrestaShop\Core\Module\WidgetInterface;
+if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+    require_once __DIR__ . '/vendor/autoload.php';
+}
 
-require dirname(__FILE__) . '/ps_menutoplinks.class.php';
+use PrestaShop\Module\Mainmenu\Cache\MenuCache;
+use PrestaShop\Module\Mainmenu\Install\Installer;
+use PrestaShop\Module\Mainmenu\Menu\CachedMenu;
+use PrestaShop\Module\Mainmenu\Menu\CategoryThumbnails;
+use PrestaShop\Module\Mainmenu\Menu\CurrentPage;
+use PrestaShop\Module\Mainmenu\Menu\MenuBuilder;
+use PrestaShop\Module\Mainmenu\Menu\MenuConfiguration;
+use PrestaShop\Module\Mainmenu\Menu\MenuItem;
+use PrestaShop\Module\Mainmenu\Menu\MenuItemType;
+use PrestaShop\Module\Mainmenu\Menu\MenuTree;
+use PrestaShop\Module\Mainmenu\Repository\CategoryRepository;
+use PrestaShop\Module\Mainmenu\Repository\CmsRepository;
+use PrestaShop\Module\Mainmenu\Repository\LinkRepository;
+use PrestaShop\PrestaShop\Core\Module\WidgetInterface;
 
 class Ps_MainMenu extends Module implements WidgetInterface
 {
-    /**
-     * @var string Name of the module running on PS 1.6.x. Used for data migration.
-     */
-    const PS_16_EQUIVALENT_MODULE = 'blocktopmenu';
+    private const TEMPLATE = 'module:ps_mainmenu/ps_mainmenu.tpl';
 
-    const MENU_JSON_CACHE_KEY = 'MOD_BLOCKTOPMENU_MENU_JSON';
-
-    /**
-     * Changes each time the cache is cleared, so that a menu built from older data is never read.
-     */
-    const MENU_CACHE_VERSION_KEY = 'MOD_BLOCKTOPMENU_CACHE_VERSION';
-
-    protected $_menu = '';
     protected $_html = '';
-    protected $user_groups;
-
-    /*
-     * Pattern for matching config values
-     */
-    protected $pattern = '/^([A-Z_]*)[0-9]+/';
-
-    /*
-     * Name of the controller
-     * Used to set item selected or not in top menu
-     */
-    protected $page_name = '';
 
     /*
      * Spaces per depth in BO
      */
-    protected $spacer_size = '5';
+    protected $spacer_size = 5;
 
-    /*
-     * Array of files from the category image directory
-     */
-    private $imageFiles;
-
-    /**
-     * @var string[]|null
-     */
-    private $configuredMenuItems;
+    private ?CachedMenu $cachedMenu = null;
+    private ?LinkRepository $linkRepository = null;
+    private ?MenuCache $menuCache = null;
+    private ?MenuConfiguration $menuConfiguration = null;
 
     public function __construct()
     {
         $this->name = 'ps_mainmenu';
         $this->tab = 'front_office_features';
-        $this->version = '2.3.6';
+        $this->version = '3.0.0';
         $this->author = 'PrestaShop';
-        $this->imageFiles = null;
 
         $this->bootstrap = true;
         parent::__construct();
 
         $this->displayName = $this->trans('Main menu', [], 'Modules.Mainmenu.Admin');
         $this->description = $this->trans('Make it easy for your visitors to find their way on your store, select the right link and turn it into a menu item.', [], 'Modules.Mainmenu.Admin');
-        $this->ps_versions_compliancy = ['min' => '1.7.1.0', 'max' => _PS_VERSION_];
+        $this->ps_versions_compliancy = ['min' => '9.0.0', 'max' => _PS_VERSION_];
     }
 
-    public function install($delete_params = true)
+    public function isUsingNewTranslationSystem(): bool
     {
-        if (!parent::install() ||
-            !$this->registerHook('actionObjectCategoryUpdateAfter') ||
-            !$this->registerHook('actionObjectCategoryDeleteAfter') ||
-            !$this->registerHook('actionObjectCategoryAddAfter') ||
-            !$this->registerHook('actionObjectCmsUpdateAfter') ||
-            !$this->registerHook('actionObjectCmsDeleteAfter') ||
-            !$this->registerHook('actionObjectCmsAddAfter') ||
-            !$this->registerHook('actionObjectSupplierUpdateAfter') ||
-            !$this->registerHook('actionObjectSupplierDeleteAfter') ||
-            !$this->registerHook('actionObjectSupplierAddAfter') ||
-            !$this->registerHook('actionObjectManufacturerUpdateAfter') ||
-            !$this->registerHook('actionObjectManufacturerDeleteAfter') ||
-            !$this->registerHook('actionObjectManufacturerAddAfter') ||
-            !$this->registerHook('actionObjectProductUpdateAfter') ||
-            !$this->registerHook('actionObjectProductDeleteAfter') ||
-            !$this->registerHook('actionObjectProductAddAfter') ||
-            !$this->registerHook('actionCategoryUpdate') ||
-            !$this->registerHook('actionMetaPageSave') ||
-            !$this->registerHook('actionShopDataDuplication') ||
-            !$this->registerHook('displayTop')) {
-            return false;
-        }
-
-        if ($delete_params) {
-            if ($this->uninstallPrestaShop16Module()) {
-                Configuration::deleteByName('MOD_BLOCKTOPMENU_SEARCH');
-
-                return true;
-            }
-            if (!$this->installDb() || !Configuration::updateGlobalValue('MOD_BLOCKTOPMENU_ITEMS', 'CAT3,CAT6,CAT9')) {
-                return false;
-            }
-        }
-
         return true;
     }
 
-    public function installDb()
+    public function install(): bool
     {
-        return Db::getInstance()->execute('
-		CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . 'linksmenutop` (
-			`id_linksmenutop` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-			`id_shop` INT(11) UNSIGNED NOT NULL,
-			`new_window` TINYINT( 1 ) NOT NULL,
-			INDEX (`id_shop`)
-		) ENGINE = ' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8mb4;') &&
-            Db::getInstance()->execute('
-			 CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . 'linksmenutop_lang` (
-			`id_linksmenutop` INT(11) UNSIGNED NOT NULL,
-			`id_lang` INT(11) UNSIGNED NOT NULL,
-			`id_shop` INT(11) UNSIGNED NOT NULL,
-			`label` VARCHAR( 128 ) NOT NULL ,
-			`link` VARCHAR( 128 ) NOT NULL ,
-			INDEX ( `id_linksmenutop` , `id_lang`, `id_shop`)
-		) ENGINE = ' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8mb4;') &&
-            Db::getInstance()->execute('
-            INSERT IGNORE INTO `' . _DB_PREFIX_ . 'hook` (`name`, `title`, `description`) VALUES
-            (\'actionMainMenuModifier\', \'Modify main menu view data\', \'This hook allows to alter main menu data\');');
-    }
-
-    public function uninstall($delete_params = true)
-    {
-        if (!parent::uninstall()) {
+        if (!parent::install()) {
             return false;
         }
 
-        $this->clearMenuCache();
-
-        if ($delete_params) {
-            if (!$this->uninstallDB() || !Configuration::deleteByName('MOD_BLOCKTOPMENU_ITEMS') || !Configuration::deleteByName(self::MENU_CACHE_VERSION_KEY)) {
-                return false;
-            }
-        }
-
-        return true;
+        return $this->getInstaller()->install($this);
     }
 
-    protected function uninstallDb()
+    public function uninstall(): bool
     {
-        Db::getInstance()->execute('DROP TABLE `' . _DB_PREFIX_ . 'linksmenutop`');
-        Db::getInstance()->execute('DROP TABLE `' . _DB_PREFIX_ . 'linksmenutop_lang`');
+        $this->getMenuCache()->clear();
 
-        return true;
-    }
-
-    public function reset()
-    {
-        if (!$this->uninstall(false)) {
-            return false;
-        }
-        if (!$this->install(false)) {
-            return false;
-        }
-
-        return true;
+        return $this->getInstaller()->uninstall() && parent::uninstall();
     }
 
     /**
-     * Migrate data from 1.6 equivalent module (if applicable), then uninstall
+     * Keeps the menu and its custom links.
      */
-    public function uninstallPrestaShop16Module()
+    public function reset(): bool
     {
-        if (!Module::isInstalled(self::PS_16_EQUIVALENT_MODULE)) {
-            return false;
-        }
-        $oldModule = Module::getInstanceByName(self::PS_16_EQUIVALENT_MODULE);
-        if ($oldModule) {
-            // This closure calls the parent class to prevent data to be erased
-            // It allows the new module to be configured without migration
-            $parentUninstallClosure = function () {
-                return parent::uninstall();
-            };
-            $parentUninstallClosure = $parentUninstallClosure->bindTo($oldModule, get_class($oldModule));
-            $parentUninstallClosure();
+        $this->getMenuCache()->clear();
+
+        return parent::uninstall() && parent::install() && $this->getInstaller()->registerHooks($this);
+    }
+
+    public function getWidgetVariables($hookName, array $configuration)
+    {
+        $menu = $this->getCachedMenu()->getTree();
+        MenuTree::markCurrentPage($menu, (new CurrentPage($this->context))->getIdentifier());
+
+        return $menu;
+    }
+
+    public function renderWidget($hookName, array $configuration)
+    {
+        $variant = $this->getCachedMarkupVariant();
+        if ($variant !== null) {
+            $markup = $this->getCachedMenu()->getMarkup($variant);
+            if ($markup !== null) {
+                return $markup;
+            }
         }
 
-        return true;
+        $menu = $this->getWidgetVariables($hookName, $configuration);
+
+        Hook::exec('actionMainMenuModifier', ['menu' => &$menu]);
+
+        $this->smarty->assign([
+            'menu' => $menu,
+        ]);
+
+        $markup = $this->fetch(self::TEMPLATE);
+        if ($variant !== null) {
+            $this->getCachedMenu()->saveMarkup($variant, $markup);
+        }
+
+        return $markup;
+    }
+
+    /**
+     * The markup is the same on every page which is not in the menu, so it is stored once for all of them.
+     * It follows the Smarty cache setting of the shop, and is not used when a module alters the menu.
+     *
+     * @return string|null What the stored markup depends on, null when the menu must be rendered
+     */
+    private function getCachedMarkupVariant(): ?string
+    {
+        if (!Configuration::get('PS_SMARTY_CACHE')
+            || (int) Configuration::get('PS_SMARTY_FORCE_COMPILE') === _PS_SMARTY_FORCE_COMPILE_
+            || Hook::getHookModuleExecList('actionMainMenuModifier')
+        ) {
+            return null;
+        }
+
+        $template = $this->getTemplatePath('ps_mainmenu.tpl');
+        if (!$template) {
+            return null;
+        }
+
+        $pageIdentifiers = $this->getCachedMenu()->getPageIdentifiers();
+        if (isset($pageIdentifiers[(new CurrentPage($this->context))->getIdentifier()])) {
+            return null;
+        }
+
+        return $template . @filemtime($template);
+    }
+
+    public function hookActionObjectCategoryAddAfter(array $params): void
+    {
+        $this->clearMenuCacheForCategories();
+    }
+
+    public function hookActionObjectCategoryUpdateAfter(array $params): void
+    {
+        $this->clearMenuCacheForCategories();
+    }
+
+    public function hookActionObjectCategoryDeleteAfter(array $params): void
+    {
+        $this->clearMenuCacheForCategories();
+    }
+
+    public function hookActionCategoryUpdate(array $params): void
+    {
+        $this->clearMenuCacheForCategories();
+    }
+
+    public function hookActionObjectCmsAddAfter(array $params): void
+    {
+        $this->clearMenuCacheIfUsed([], [MenuItemType::CmsCategory]);
+    }
+
+    public function hookActionObjectCmsUpdateAfter(array $params): void
+    {
+        $this->clearMenuCacheForObject($params, MenuItemType::CmsPage, [], [MenuItemType::CmsCategory]);
+    }
+
+    public function hookActionObjectCmsDeleteAfter(array $params): void
+    {
+        $this->clearMenuCacheForObject($params, MenuItemType::CmsPage, [], [MenuItemType::CmsCategory]);
+    }
+
+    public function hookActionObjectManufacturerAddAfter(array $params): void
+    {
+        $this->clearMenuCacheIfUsed([MenuItemType::AllManufacturers->value . '0']);
+    }
+
+    public function hookActionObjectManufacturerUpdateAfter(array $params): void
+    {
+        $this->clearMenuCacheForObject($params, MenuItemType::Manufacturer, [MenuItemType::AllManufacturers->value . '0']);
+    }
+
+    public function hookActionObjectManufacturerDeleteAfter(array $params): void
+    {
+        $this->clearMenuCacheForObject($params, MenuItemType::Manufacturer, [MenuItemType::AllManufacturers->value . '0']);
+    }
+
+    public function hookActionObjectSupplierAddAfter(array $params): void
+    {
+        $this->clearMenuCacheIfUsed([MenuItemType::AllSuppliers->value . '0']);
+    }
+
+    public function hookActionObjectSupplierUpdateAfter(array $params): void
+    {
+        $this->clearMenuCacheForObject($params, MenuItemType::Supplier, [MenuItemType::AllSuppliers->value . '0']);
+    }
+
+    public function hookActionObjectSupplierDeleteAfter(array $params): void
+    {
+        $this->clearMenuCacheForObject($params, MenuItemType::Supplier, [MenuItemType::AllSuppliers->value . '0']);
+    }
+
+    public function hookActionObjectProductUpdateAfter(array $params): void
+    {
+        $this->clearMenuCacheForObject($params, MenuItemType::Product);
+    }
+
+    public function hookActionObjectProductDeleteAfter(array $params): void
+    {
+        $this->clearMenuCacheForObject($params, MenuItemType::Product);
+    }
+
+    public function hookActionMetaPageSave(array $params): void
+    {
+        $this->clearMenuCache();
+    }
+
+    public function hookActionShopDataDuplication(array $params): void
+    {
+        $this->getLinkRepository()->duplicate((int) $params['old_id_shop'], (int) $params['new_id_shop']);
+    }
+
+    /**
+     * Product links can hold a category rewrite, so product items depend on categories as well.
+     */
+    private function clearMenuCacheForCategories(): void
+    {
+        $this->clearMenuCacheIfUsed([], [MenuItemType::Category, MenuItemType::Product]);
+    }
+
+    /**
+     * @param array<string, mixed> $params Parameters of an actionObject*After hook
+     * @param MenuItemType $type Type of the menu item pointing to this object
+     * @param string[] $items Other menu items showing this object
+     * @param MenuItemType[] $types Other types of menu items showing this object
+     */
+    private function clearMenuCacheForObject(array $params, MenuItemType $type, array $items = [], array $types = []): void
+    {
+        if (!isset($params['object']->id)) {
+            $this->clearMenuCache();
+
+            return;
+        }
+
+        $items[] = (string) new MenuItem($type, (int) $params['object']->id);
+        $this->clearMenuCacheIfUsed($items, $types);
+    }
+
+    /**
+     * Clears the cache only when a menu shows one of these items, or an item of one of these types.
+     *
+     * @param string[] $items
+     * @param MenuItemType[] $types
+     */
+    private function clearMenuCacheIfUsed(array $items, array $types = []): void
+    {
+        if ($this->getMenuConfiguration()->usesAnyOf($items, $types)) {
+            $this->clearMenuCache();
+        }
+    }
+
+    private function clearMenuCache(): void
+    {
+        $this->getMenuConfiguration()->forgetItemsOfAllShops();
+        $this->getMenuCache()->clear();
+    }
+
+    private function getInstaller(): Installer
+    {
+        return new Installer(Db::getInstance(), $this->getLinkRepository());
+    }
+
+    private function getLinkRepository(): LinkRepository
+    {
+        return $this->linkRepository ??= new LinkRepository(Db::getInstance());
+    }
+
+    private function getMenuConfiguration(): MenuConfiguration
+    {
+        return $this->menuConfiguration ??= new MenuConfiguration(Db::getInstance());
+    }
+
+    private function getMenuCache(): MenuCache
+    {
+        return $this->menuCache ??= new MenuCache(_PS_CACHE_DIR_ . $this->name);
+    }
+
+    private function getCachedMenu(): CachedMenu
+    {
+        return $this->cachedMenu ??= new CachedMenu(
+            $this->context,
+            new MenuBuilder(
+                $this->context,
+                $this->getLinkRepository(),
+                new CmsRepository(Db::getInstance()),
+                new CategoryThumbnails(_PS_CAT_IMG_DIR_),
+                $this->getTranslator()
+            ),
+            $this->getMenuConfiguration(),
+            $this->getMenuCache()
+        );
+    }
+
+    /**
+     * @return string[] Items being edited in the configuration form
+     */
+    private function getEditedMenuItems(): array
+    {
+        $items = Tools::getValue('items');
+
+        return is_array($items) && count($items) ? $items : $this->getMenuConfiguration()->getItems();
     }
 
     public function getContent()
@@ -235,15 +369,10 @@ class Ps_MainMenu extends Module implements WidgetInterface
             $shops = Shop::getContextListShopID();
 
             foreach ($shops as $shop_id) {
-                $shop_group_id = Shop::getGroupFromShop($shop_id);
                 $updated = true;
 
                 if (count($shops) == 1) {
-                    if (is_array($items) && count($items)) {
-                        $updated = Configuration::updateValue('MOD_BLOCKTOPMENU_ITEMS', (string) implode(',', $items), false, (int) $shop_group_id, (int) $shop_id);
-                    } else {
-                        $updated = Configuration::updateValue('MOD_BLOCKTOPMENU_ITEMS', '', false, (int) $shop_group_id, (int) $shop_id);
-                    }
+                    $updated = $this->getMenuConfiguration()->saveItems(is_array($items) ? $items : [], (int) $shop_id);
                 }
 
                 if (!$updated) {
@@ -282,7 +411,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
                         $shops = Shop::getContextListShopID();
 
                         foreach ($shops as $shop_id) {
-                            $added = Ps_MenuTopLinks::add($links_label, $labels, Tools::getValue('new_window', 0), (int) $shop_id);
+                            $added = $this->getLinkRepository()->add($links_label, $labels, (bool) Tools::getValue('new_window', 0), (int) $shop_id);
 
                             if (!$added) {
                                 $shop = new Shop($shop_id);
@@ -304,8 +433,8 @@ class Ps_MainMenu extends Module implements WidgetInterface
                 $shops = Shop::getContextListShopID();
 
                 foreach ($shops as $shop_id) {
-                    $deleted = Ps_MenuTopLinks::remove($id_linksmenutop, (int) $shop_id);
-                    Configuration::updateValue('MOD_BLOCKTOPMENU_ITEMS', str_replace(['LNK' . $id_linksmenutop . ',', 'LNK' . $id_linksmenutop], '', Configuration::get('MOD_BLOCKTOPMENU_ITEMS')));
+                    $deleted = $this->getLinkRepository()->delete((int) $id_linksmenutop, (int) $shop_id);
+                    $this->getMenuConfiguration()->removeItem(new MenuItem(MenuItemType::Link, (int) $id_linksmenutop), (int) $shop_id);
 
                     if (!$deleted) {
                         $shop = new Shop($shop_id);
@@ -334,7 +463,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
                         $label[$lang['id_lang']] = Tools::getValue('label_' . (int) $lang['id_lang']);
                     }
 
-                    Ps_MenuTopLinks::update($link, $label, $new_window, (int) $id_shop, (int) $id_linksmenutop);
+                    $this->getLinkRepository()->update($id_linksmenutop, $link, $label, (bool) $new_window, $id_shop);
                     $this->_html .= $this->displayConfirmation($this->trans('The link has been edited.', [], 'Modules.Mainmenu.Admin'));
                 }
                 $update_cache = true;
@@ -359,7 +488,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
         $this->_html .= $this->renderForm() . $this->renderAddForm();
 
         foreach ($shops as $shop_id) {
-            $links = array_merge($links, Ps_MenuTopLinks::gets((int) $id_lang, null, (int) $shop_id));
+            $links = array_merge($links, $this->getLinkRepository()->findAll($id_lang, (int) $shop_id));
         }
 
         if (!count($links)) {
@@ -397,376 +526,106 @@ class Ps_MainMenu extends Module implements WidgetInterface
                 '</div>';
     }
 
-    protected function getMenuItems()
+    /**
+     * @return string Select holding the items of the menu being edited
+     */
+    private function makeMenuOption(): string
     {
-        $items = Tools::getValue('items');
-        if (is_array($items) && count($items)) {
-            return $items;
-        }
-
-        return $this->getSavedMenuItems();
-    }
-
-    protected function getSavedMenuItems()
-    {
-        $shops = Shop::getContextListShopID();
-        $conf = null;
-
-        if (count($shops) > 1) {
-            foreach ($shops as $key => $shop_id) {
-                $shop_group_id = Shop::getGroupFromShop($shop_id);
-                $conf .= (string) ($key > 1 ? ',' : '') . Configuration::get('MOD_BLOCKTOPMENU_ITEMS', null, $shop_group_id, $shop_id);
-            }
-        } else {
-            $shop_id = (int) $shops[0];
-            $shop_group_id = Shop::getGroupFromShop($shop_id);
-            $conf = Configuration::get('MOD_BLOCKTOPMENU_ITEMS', null, $shop_group_id, $shop_id);
-        }
-
-        if (strlen($conf)) {
-            return explode(',', $conf);
-        }
-
-        return [];
-    }
-
-    protected function makeMenuOption()
-    {
-        $id_shop = (int) Shop::getContextShopID();
-
-        $menu_item = $this->getMenuItems();
         $id_lang = (int) $this->context->language->id;
-
         $html = '<select multiple="multiple" name="items[]" id="items" style="width: 300px; height: 160px;">';
-        foreach ($menu_item as $item) {
-            if (!$item) {
-                continue;
-            }
 
-            preg_match($this->pattern, $item, $values);
-            $id = (int) substr($item, strlen($values[1]), strlen($item));
-
-            switch (substr($item, 0, strlen($values[1]))) {
-                case 'CAT':
-                    $category = new Category((int) $id, (int) $id_lang);
-                    if (Validate::isLoadedObject($category)) {
-                        $html .= '<option selected="selected" value="CAT' . $id . '">' . $category->name . '</option>' . PHP_EOL;
-                    }
-                    break;
-
-                case 'PRD':
-                    $product = new Product((int) $id, true, (int) $id_lang);
-                    if (Validate::isLoadedObject($product)) {
-                        $html .= '<option selected="selected" value="PRD' . $id . '">' . $product->name . '</option>' . PHP_EOL;
-                    }
-                    break;
-
-                case 'CMS':
-                    $cms = new CMS((int) $id, (int) $id_lang);
-                    if (Validate::isLoadedObject($cms)) {
-                        $html .= '<option selected="selected" value="CMS' . $id . '">' . $cms->meta_title . '</option>' . PHP_EOL;
-                    }
-                    break;
-
-                case 'CMS_CAT':
-                    $category = new CMSCategory((int) $id, (int) $id_lang);
-                    if (Validate::isLoadedObject($category)) {
-                        $html .= '<option selected="selected" value="CMS_CAT' . $id . '">' . $category->name . '</option>' . PHP_EOL;
-                    }
-                    break;
-
-                // Case to handle the option to show all Manufacturers
-                case 'ALLMAN':
-                    $html .= '<option selected="selected" value="ALLMAN0">' . $this->trans('All brands', [], 'Modules.Mainmenu.Admin') . '</option>' . PHP_EOL;
-                    break;
-
-                case 'MAN':
-                    $manufacturer = new Manufacturer((int) $id, (int) $id_lang);
-                    if (Validate::isLoadedObject($manufacturer)) {
-                        $html .= '<option selected="selected" value="MAN' . $id . '">' . $manufacturer->name . '</option>' . PHP_EOL;
-                    }
-                    break;
-
-                // Case to handle the option to show all Suppliers
-                case 'ALLSUP':
-                    $html .= '<option selected="selected" value="ALLSUP0">' . $this->trans('All suppliers', [], 'Modules.Mainmenu.Admin') . '</option>' . PHP_EOL;
-                    break;
-
-                case 'SUP':
-                    $supplier = new Supplier((int) $id, (int) $id_lang);
-                    if (Validate::isLoadedObject($supplier)) {
-                        $html .= '<option selected="selected" value="SUP' . $id . '">' . $supplier->name . '</option>' . PHP_EOL;
-                    }
-                    break;
-
-                case 'LNK':
-                    $link = Ps_MenuTopLinks::get((int) $id, (int) $id_lang, (int) $id_shop);
-                    if (count($link)) {
-                        if (!isset($link[0]['label']) || ($link[0]['label'] == '')) {
-                            $default_language = Configuration::get('PS_LANG_DEFAULT');
-                            $link = Ps_MenuTopLinks::get($link[0]['id_linksmenutop'], (int) $default_language, (int) Shop::getContextShopID());
-                        }
-                        $html .= '<option selected="selected" value="LNK' . (int) $link[0]['id_linksmenutop'] . '">' . Tools::safeOutput($link[0]['label']) . '</option>';
-                    }
-                    break;
-
-                case 'SHOP':
-                    $shop = new Shop((int) $id);
-                    if (Validate::isLoadedObject($shop)) {
-                        $html .= '<option selected="selected" value="SHOP' . (int) $id . '">' . $shop->name . '</option>' . PHP_EOL;
-                    }
-                    break;
+        foreach ($this->getEditedMenuItems() as $configured_item) {
+            $item = MenuItem::fromString((string) $configured_item);
+            $label = $item === null ? null : $this->getMenuItemLabel($item, $id_lang);
+            if ($label !== null) {
+                $html .= '<option selected="selected" value="' . $item . '">' . $label . '</option>' . PHP_EOL;
             }
         }
 
         return $html . '</select>';
     }
 
-    protected function makeNode(array $fields)
+    /**
+     * @return string|null Null when the item points to something which no longer exists
+     */
+    private function getMenuItemLabel(MenuItem $item, int $id_lang): ?string
     {
-        $defaults = [
-            'type' => '',
-            'label' => '',
-            'url' => '',
-            'children' => [],
-            'open_in_new_window' => false,
-            'image_urls' => [],
-            'page_identifier' => null,
-        ];
+        switch ($item->type) {
+            case MenuItemType::AllManufacturers:
+                return $this->trans('All brands', [], 'Modules.Mainmenu.Admin');
 
-        return array_merge($defaults, $fields);
+            case MenuItemType::AllSuppliers:
+                return $this->trans('All suppliers', [], 'Modules.Mainmenu.Admin');
+
+            case MenuItemType::Link:
+                $link = $this->getLinkRepository()->findWithFallback(
+                    $item->id,
+                    $id_lang,
+                    (int) Shop::getContextShopID(),
+                    (int) Configuration::get('PS_LANG_DEFAULT')
+                );
+
+                return $link === null ? null : Tools::safeOutput($link['label']);
+
+            case MenuItemType::Category:
+                $object = new Category($item->id, $id_lang);
+                break;
+
+            case MenuItemType::CmsCategory:
+                $object = new CMSCategory($item->id, $id_lang);
+                break;
+
+            case MenuItemType::CmsPage:
+                $object = new CMS($item->id, $id_lang);
+
+                return Validate::isLoadedObject($object) ? $object->meta_title : null;
+
+            case MenuItemType::Manufacturer:
+                $object = new Manufacturer($item->id, $id_lang);
+                break;
+
+            case MenuItemType::Product:
+                $object = new Product($item->id, false, $id_lang);
+                break;
+
+            case MenuItemType::Shop:
+                $object = new Shop($item->id);
+                break;
+
+            case MenuItemType::Supplier:
+                $object = new Supplier($item->id, $id_lang);
+                break;
+        }
+
+        return Validate::isLoadedObject($object) ? $object->name : null;
     }
 
-    protected function generateCMSCategoriesMenu($id_cms_category, $id_lang)
+    /**
+     * @param string[] $items_to_skip Items already in the menu
+     *
+     * @return string Options of the CMS categories and pages under a CMS category
+     */
+    private function getCMSOptions(CmsRepository $cmsRepository, int $id_parent, int $depth, array $items_to_skip): string
     {
-        $category = new CMSCategory($id_cms_category, $id_lang);
-
-        $rawSubCategories = $this->getCMSCategories(false, $id_cms_category, $id_lang);
-        $rawSubPages = $this->getCMSPages($id_cms_category);
-
-        $subCategories = array_map(function ($category) use ($id_lang) {
-            return $this->generateCMSCategoriesMenu($category['id_cms_category'], $id_lang);
-        }, $rawSubCategories);
-
-        $subPages = array_map(function ($page) use ($id_lang) {
-            return $this->makeNode([
-                'type' => 'cms-page',
-                'page_identifier' => 'cms-page-' . $page['id_cms'],
-                'label' => $page['meta_title'],
-                'url' => $this->context->link->getCMSLink(
-                    (int) $page['id_cms'],
-                    $page['link_rewrite'],
-                    null,
-                    $id_lang
-                ),
-            ]);
-        }, $rawSubPages);
-
-        $node = $this->makeNode([
-            'type' => 'cms-category',
-            'page_identifier' => 'cms-category-' . $id_cms_category,
-            'label' => $category->name,
-            'url' => $category->getLink(),
-            'children' => array_merge($subCategories, $subPages),
-        ]);
-
-        return $node;
-    }
-
-    protected function makeMenu()
-    {
-        $root_node = $this->makeNode([
-            'label' => null,
-            'type' => 'root',
-            'children' => [],
-        ]);
-
-        $menu_items = $this->getSavedMenuItems();
+        $html = '';
         $id_lang = (int) $this->context->language->id;
-        $id_shop = (int) Shop::getContextShopID();
+        $id_shop = (int) $this->context->shop->id;
+        $spacer = str_repeat('&nbsp;', $this->spacer_size * $depth);
 
-        foreach ($menu_items as $item) {
-            if (!$item) {
-                continue;
+        foreach ($cmsRepository->getCategories($id_parent, $id_lang, $id_shop) as $category) {
+            if (!in_array('CMS_CAT' . $category['id_cms_category'], $items_to_skip)) {
+                $html .= '<option value="CMS_CAT' . $category['id_cms_category'] . '" style="font-weight: bold;">' . $spacer . $category['name'] . '</option>';
             }
+            $html .= $this->getCMSOptions($cmsRepository, (int) $category['id_cms_category'], $depth + 1, $items_to_skip);
+        }
 
-            preg_match($this->pattern, $item, $value);
-            $id = (int) substr($item, strlen($value[1]), strlen($item));
-
-            switch (substr($item, 0, strlen($value[1]))) {
-                case 'CAT':
-                    $categories = $this->generateCategoriesMenu(
-                        Category::getNestedCategories($id, $id_lang, false, $this->user_groups)
-                    );
-                    $root_node['children'] = array_merge($root_node['children'], $categories);
-                    break;
-
-                case 'PRD':
-                    $product = new Product((int) $id, false, (int) $id_lang);
-                    if ($product->id) {
-                        $root_node['children'][] = $this->makeNode([
-                            'type' => 'product',
-                            'page_identifier' => 'product-' . $product->id,
-                            'label' => $product->name,
-                            'url' => $product->getLink(),
-                        ]);
-                    }
-                    break;
-
-                case 'CMS':
-                    $cms = CMS::getLinks((int) $id_lang, [$id]);
-                    if (count($cms)) {
-                        $root_node['children'][] = $this->makeNode([
-                            'type' => 'cms-page',
-                            'page_identifier' => 'cms-page-' . $id,
-                            'label' => $cms[0]['meta_title'],
-                            'url' => $cms[0]['link'],
-                        ]);
-                    }
-                    break;
-
-                case 'CMS_CAT':
-                    $root_node['children'][] = $this->generateCMSCategoriesMenu((int) $id, (int) $id_lang);
-                    break;
-
-                // Case to handle the option to show all Manufacturers
-                case 'ALLMAN':
-                    $children = array_map(function ($manufacturer) use ($id_lang) {
-                        return $this->makeNode([
-                            'type' => 'manufacturer',
-                            'page_identifier' => 'manufacturer-' . $manufacturer['id_manufacturer'],
-                            'label' => $manufacturer['name'],
-                            'url' => $this->context->link->getManufacturerLink(
-                                (int) $manufacturer['id_manufacturer'],
-                                Tools::str2url($manufacturer['name']),
-                                $id_lang
-                            ),
-                        ]);
-                    }, Manufacturer::getManufacturers());
-
-                    $root_node['children'][] = $this->makeNode([
-                        'type' => 'manufacturers',
-                        'page_identifier' => 'manufacturers',
-                        'label' => $this->trans('All brands', [], 'Modules.Mainmenu.Admin'),
-                        'url' => $this->context->link->getPageLink('manufacturer'),
-                        'children' => $children,
-                    ]);
-                    break;
-
-                case 'MAN':
-                    $manufacturer = new Manufacturer($id, $id_lang);
-                    if ($manufacturer->id) {
-                        $root_node['children'][] = $this->makeNode([
-                            'type' => 'manufacturer',
-                            'page_identifier' => 'manufacturer-' . $manufacturer->id,
-                            'label' => $manufacturer->name,
-                            'url' => $this->context->link->getManufacturerLink(
-                                $manufacturer,
-                                null,
-                                $id_lang
-                            ),
-                        ]);
-                    }
-                    break;
-
-                // Case to handle the option to show all Suppliers
-                case 'ALLSUP':
-                    $children = array_map(function ($supplier) use ($id_lang) {
-                        return $this->makeNode([
-                            'type' => 'supplier',
-                            'page_identifier' => 'supplier-' . $supplier['id_supplier'],
-                            'label' => $supplier['name'],
-                            'url' => $this->context->link->getSupplierLink(
-                                (int) $supplier['id_supplier'],
-                                Tools::str2url($supplier['name']),
-                                $id_lang
-                            ),
-                        ]);
-                    }, Supplier::getSuppliers());
-
-                    $root_node['children'][] = $this->makeNode([
-                        'type' => 'suppliers',
-                        'page_identifier' => 'suppliers',
-                        'label' => $this->trans('All suppliers', [], 'Modules.Mainmenu.Admin'),
-                        'url' => $this->context->link->getPageLink('supplier'),
-                        'children' => $children,
-                    ]);
-                    break;
-
-                case 'SUP':
-                    $supplier = new Supplier($id, $id_lang);
-                    if ($supplier->id) {
-                        $root_node['children'][] = $this->makeNode([
-                            'type' => 'supplier',
-                            'page_identifier' => 'supplier-' . $supplier->id,
-                            'label' => $supplier->name,
-                            'url' => $this->context->link->getSupplierLink(
-                                $supplier,
-                                null,
-                                $id_lang
-                            ),
-                        ]);
-                    }
-                    break;
-
-                case 'SHOP':
-                    $shop = new Shop((int) $id);
-                    if (Validate::isLoadedObject($shop)) {
-                        $root_node['children'][] = $this->makeNode([
-                            'type' => 'shop',
-                            'page_identifier' => 'shop-' . $id,
-                            'label' => $shop->name,
-                            'url' => $shop->getBaseURL(),
-                        ]);
-                    }
-                    break;
-                case 'LNK':
-                    $link = Ps_MenuTopLinks::get($id, $id_lang, $id_shop);
-                    if (!empty($link)) {
-                        if (!isset($link[0]['label']) || ($link[0]['label'] == '')) {
-                            $default_language = Configuration::get('PS_LANG_DEFAULT');
-                            $link = Ps_MenuTopLinks::get($link[0]['id_linksmenutop'], $default_language, (int) Shop::getContextShopID());
-                        }
-                        $root_node['children'][] = $this->makeNode([
-                            'type' => 'link',
-                            'page_identifier' => 'lnk-' . Tools::str2url($link[0]['label']),
-                            'label' => $link[0]['label'],
-                            'url' => $link[0]['link'],
-                            'open_in_new_window' => $link[0]['new_window'],
-                        ]);
-                    }
-                    break;
+        foreach ($cmsRepository->getPages($id_parent, $id_lang, $id_shop) as $page) {
+            if (!in_array('CMS' . $page['id_cms'], $items_to_skip)) {
+                $html .= '<option value="CMS' . $page['id_cms'] . '">' . $spacer . $page['meta_title'] . '</option>';
             }
         }
 
-        $this->setDepth($root_node, 0);
-
-        return $root_node;
-    }
-
-    private function setDepth(array &$node, $depth)
-    {
-        $node['depth'] = $depth;
-        foreach ($node['children'] as &$child) {
-            $this->setDepth($child, $depth + 1);
-        }
-    }
-
-    private function markCurrentNode(array &$node, $page_identifier)
-    {
-        $node['current'] = ($page_identifier === $node['page_identifier']);
-        foreach ($node['children'] as &$child) {
-            $this->markCurrentNode($child, $page_identifier);
-        }
-    }
-
-    protected function mapTree(callable $cb, array $node, $depth = 0)
-    {
-        $node['children'] = array_map(function ($child) use ($cb, $depth) {
-            return $this->mapTree($cb, $child, $depth + 1);
-        }, $node['children']);
-
-        return $cb($node, $depth);
+        return $html;
     }
 
     protected function generateCategoriesOption($categories, $items_to_skip = null)
@@ -786,388 +645,6 @@ class Ps_MainMenu extends Module implements WidgetInterface
         }
 
         return $html;
-    }
-
-    protected function generateCategoriesMenu($categories, $is_children = 0)
-    {
-        $nodes = [];
-
-        foreach ($categories as $key => $category) {
-            /* Whenever a category is not active we shouldnt display it to customer */
-            if ((bool) $category['active'] === false) {
-                continue;
-            }
-
-            $node = $this->makeNode([]);
-            // No access check: getNestedCategories() only returns the categories of the customer groups
-            if ($category['level_depth'] > 1) {
-                $link = $this->context->link->getCategoryLink((int) $category['id_category'], $category['link_rewrite']);
-            } else {
-                $link = $this->context->link->getPageLink('index');
-            }
-
-            $node['url'] = $link;
-            $node['type'] = 'category';
-            $node['page_identifier'] = 'category-' . $category['id_category'];
-            $node['current'] = false;
-            $node['label'] = $category['name'];
-            $node['image_urls'] = [];
-
-            if (isset($category['children']) && !empty($category['children'])) {
-                $node['children'] = $this->generateCategoriesMenu($category['children'], 1);
-            }
-
-            foreach ($this->getCategoryThumbnails((int) $category['id_category']) as $file) {
-                $node['image_urls'][] = $this->context->link->getMediaLink(_THEME_CAT_DIR_ . $file);
-            }
-
-            $nodes[] = $node;
-        }
-
-        return $nodes;
-    }
-
-    /**
-     * @return string[] Menu thumbnail files of the category
-     */
-    private function getCategoryThumbnails($id_category)
-    {
-        if ($this->imageFiles === null) {
-            $this->imageFiles = [];
-            $files = is_dir(_PS_CAT_IMG_DIR_) ? scandir(_PS_CAT_IMG_DIR_) : [];
-            foreach ($files as $file) {
-                if (preg_match('/^([0-9]+)-([0-9])?_thumb.jpg/i', $file, $matches) === 1) {
-                    $this->imageFiles[(int) $matches[1]][] = $file;
-                }
-            }
-        }
-
-        return isset($this->imageFiles[$id_category]) ? $this->imageFiles[$id_category] : [];
-    }
-
-    protected function getCMSOptions($parent = 0, $depth = 1, $id_lang = false, $items_to_skip = null, $id_shop = false)
-    {
-        $html = '';
-        $id_lang = $id_lang ? (int) $id_lang : (int) Context::getContext()->language->id;
-        $id_shop = ($id_shop !== false) ? $id_shop : Context::getContext()->shop->id;
-        $categories = $this->getCMSCategories(false, (int) $parent, (int) $id_lang, (int) $id_shop);
-        $pages = $this->getCMSPages((int) $parent, (int) $id_shop, (int) $id_lang);
-
-        $spacer = str_repeat('&nbsp;', $this->spacer_size * (int) $depth);
-
-        foreach ($categories as $category) {
-            if (isset($items_to_skip) && !in_array('CMS_CAT' . $category['id_cms_category'], $items_to_skip)) {
-                $html .= '<option value="CMS_CAT' . $category['id_cms_category'] . '" style="font-weight: bold;">' . $spacer . $category['name'] . '</option>';
-            }
-            $html .= $this->getCMSOptions($category['id_cms_category'], (int) $depth + 1, (int) $id_lang, $items_to_skip);
-        }
-
-        foreach ($pages as $page) {
-            if (isset($items_to_skip) && !in_array('CMS' . $page['id_cms'], $items_to_skip)) {
-                $html .= '<option value="CMS' . $page['id_cms'] . '">' . $spacer . $page['meta_title'] . '</option>';
-            }
-        }
-
-        return $html;
-    }
-
-    protected function getCacheId($name = null)
-    {
-        $page_name = in_array($this->page_name, ['category', 'supplier', 'manufacturer', 'cms', 'product']) ? $this->page_name : 'index';
-
-        return parent::getCacheId() . '|' . $page_name . ($page_name != 'index' ? '|' . (int) Tools::getValue('id_' . $page_name) : '');
-    }
-
-    protected function getCMSCategories($recursive = false, $parent = 1, $id_lang = false, $id_shop = false)
-    {
-        $id_lang = $id_lang ? (int) $id_lang : (int) Context::getContext()->language->id;
-        $id_shop = ($id_shop !== false) ? $id_shop : Context::getContext()->shop->id;
-        $join_shop = '';
-        $where_shop = '';
-
-        $join_shop = ' INNER JOIN `' . _DB_PREFIX_ . 'cms_category_shop` cs
-		ON (bcp.`id_cms_category` = cs.`id_cms_category`)';
-        $where_shop = ' AND cs.`id_shop` = ' . (int) $id_shop . ' AND cl.`id_shop` = ' . (int) $id_shop;
-
-        if ($recursive === false) {
-            $sql = 'SELECT bcp.`id_cms_category`, bcp.`id_parent`, bcp.`level_depth`, bcp.`active`, bcp.`position`, cl.`name`, cl.`link_rewrite`
-				FROM `' . _DB_PREFIX_ . 'cms_category` bcp' .
-                $join_shop . '
-				INNER JOIN `' . _DB_PREFIX_ . 'cms_category_lang` cl
-				ON (bcp.`id_cms_category` = cl.`id_cms_category`)
-				WHERE cl.`id_lang` = ' . (int) $id_lang . '
-				AND bcp.`id_parent` = ' . (int) $parent .
-                $where_shop;
-
-            return Db::getInstance()->executeS($sql);
-        } else {
-            $sql = 'SELECT bcp.`id_cms_category`, bcp.`id_parent`, bcp.`level_depth`, bcp.`active`, bcp.`position`, cl.`name`, cl.`link_rewrite`
-				FROM `' . _DB_PREFIX_ . 'cms_category` bcp' .
-                $join_shop . '
-				INNER JOIN `' . _DB_PREFIX_ . 'cms_category_lang` cl
-				ON (bcp.`id_cms_category` = cl.`id_cms_category`)
-				WHERE cl.`id_lang` = ' . (int) $id_lang . '
-				AND bcp.`id_parent` = ' . (int) $parent .
-                $where_shop;
-
-            $results = Db::getInstance()->executeS($sql);
-            foreach ($results as $result) {
-                $sub_categories = $this->getCMSCategories(true, $result['id_cms_category'], (int) $id_lang);
-                if ($sub_categories && count($sub_categories) > 0) {
-                    $result['sub_categories'] = $sub_categories;
-                }
-                $categories[] = $result;
-            }
-
-            return isset($categories) ? $categories : false;
-        }
-    }
-
-    protected function getCMSPages($id_cms_category, $id_shop = false, $id_lang = false)
-    {
-        $id_shop = ($id_shop !== false) ? (int) $id_shop : (int) Context::getContext()->shop->id;
-        $id_lang = $id_lang ? (int) $id_lang : (int) Context::getContext()->language->id;
-
-        $sql = 'SELECT c.`id_cms`, cl.`meta_title`, cl.`link_rewrite`
-			FROM `' . _DB_PREFIX_ . 'cms` c
-			INNER JOIN `' . _DB_PREFIX_ . 'cms_shop` cs
-			ON (c.`id_cms` = cs.`id_cms`)
-			INNER JOIN `' . _DB_PREFIX_ . 'cms_lang` cl
-			ON (c.`id_cms` = cl.`id_cms`)
-			WHERE c.`id_cms_category` = ' . (int) $id_cms_category . '
-			AND cs.`id_shop` = ' . (int) $id_shop . '
-			AND cl.`id_lang` = ' . (int) $id_lang . '
-			AND cl.`id_shop` = ' . (int) $id_shop . '
-			AND c.`active` = 1
-			ORDER BY `position`';
-
-        return Db::getInstance()->executeS($sql);
-    }
-
-    public function hookActionObjectCategoryAddAfter($params)
-    {
-        $this->clearMenuCacheForCategories();
-    }
-
-    public function hookActionObjectCategoryUpdateAfter($params)
-    {
-        $this->clearMenuCacheForCategories();
-    }
-
-    public function hookActionObjectCategoryDeleteAfter($params)
-    {
-        $this->clearMenuCacheForCategories();
-    }
-
-    public function hookActionObjectCmsUpdateAfter($params)
-    {
-        $this->clearMenuCacheForObject($params, 'CMS', [], ['CMS_CAT']);
-    }
-
-    public function hookActionObjectCmsDeleteAfter($params)
-    {
-        $this->clearMenuCacheForObject($params, 'CMS', [], ['CMS_CAT']);
-    }
-
-    public function hookActionObjectCmsAddAfter($params)
-    {
-        $this->clearMenuCacheIfUsed([], ['CMS_CAT']);
-    }
-
-    public function hookActionObjectSupplierUpdateAfter($params)
-    {
-        $this->clearMenuCacheForObject($params, 'SUP', ['ALLSUP0']);
-    }
-
-    public function hookActionObjectSupplierDeleteAfter($params)
-    {
-        $this->clearMenuCacheForObject($params, 'SUP', ['ALLSUP0']);
-    }
-
-    public function hookActionObjectSupplierAddAfter($params)
-    {
-        $this->clearMenuCacheIfUsed(['ALLSUP0']);
-    }
-
-    public function hookActionObjectManufacturerUpdateAfter($params)
-    {
-        $this->clearMenuCacheForObject($params, 'MAN', ['ALLMAN0']);
-    }
-
-    public function hookActionObjectManufacturerDeleteAfter($params)
-    {
-        $this->clearMenuCacheForObject($params, 'MAN', ['ALLMAN0']);
-    }
-
-    public function hookActionObjectManufacturerAddAfter($params)
-    {
-        $this->clearMenuCacheIfUsed(['ALLMAN0']);
-    }
-
-    public function hookActionObjectProductUpdateAfter($params)
-    {
-        $this->clearMenuCacheForObject($params, 'PRD');
-    }
-
-    public function hookActionObjectProductDeleteAfter($params)
-    {
-        $this->clearMenuCacheForObject($params, 'PRD');
-    }
-
-    public function hookActionObjectProductAddAfter($params)
-    {
-        // A product that has just been created cannot be in a menu yet
-    }
-
-    public function hookActionCategoryUpdate($params)
-    {
-        $this->clearMenuCacheForCategories();
-    }
-
-    public function hookActionMetaPageSave($params)
-    {
-        $this->clearMenuCache();
-    }
-
-    /**
-     * Product links can hold a category rewrite, so product items depend on categories as well.
-     */
-    private function clearMenuCacheForCategories()
-    {
-        $this->clearMenuCacheIfUsed([], ['CAT', 'PRD']);
-    }
-
-    /**
-     * @param array $params Parameters of an actionObject*After hook
-     * @param string $item_type Type of the menu item pointing to this object
-     * @param string[] $items Other menu items showing this object
-     * @param string[] $item_types Other types of menu items showing this object
-     */
-    private function clearMenuCacheForObject($params, $item_type, array $items = [], array $item_types = [])
-    {
-        if (!isset($params['object']->id)) {
-            $this->clearMenuCache();
-
-            return;
-        }
-
-        $items[] = $item_type . (int) $params['object']->id;
-        $this->clearMenuCacheIfUsed($items, $item_types);
-    }
-
-    /**
-     * Clears the cache only when a menu shows one of these items.
-     *
-     * @param string[] $items Menu items, e.g. PRD12
-     * @param string[] $item_types Types of menu items, e.g. CAT
-     */
-    private function clearMenuCacheIfUsed(array $items, array $item_types = [])
-    {
-        foreach ($this->getConfiguredMenuItems() as $configured_item) {
-            if (in_array($configured_item, $items)) {
-                $this->clearMenuCache();
-
-                return;
-            }
-            foreach ($item_types as $item_type) {
-                if (preg_match('/^' . $item_type . '[0-9]+$/', $configured_item) === 1) {
-                    $this->clearMenuCache();
-
-                    return;
-                }
-            }
-        }
-    }
-
-    /**
-     * @return string[] Items of the menus of every shop
-     */
-    private function getConfiguredMenuItems()
-    {
-        if ($this->configuredMenuItems === null) {
-            $this->configuredMenuItems = [];
-            $rows = Db::getInstance()->executeS(
-                'SELECT `value` FROM `' . _DB_PREFIX_ . 'configuration` WHERE `name` = "MOD_BLOCKTOPMENU_ITEMS"'
-            );
-            foreach ($rows ?: [] as $row) {
-                $this->configuredMenuItems = array_merge($this->configuredMenuItems, explode(',', (string) $row['value']));
-            }
-        }
-
-        return $this->configuredMenuItems;
-    }
-
-    protected function getCacheDirectory()
-    {
-        $dir = _PS_CACHE_DIR_ . 'ps_mainmenu';
-
-        if (isset($this->context->customer)) {
-            $groups = $this->context->customer->getGroups();
-            if (!empty($groups)) {
-                $dir .= '/' . implode('_', $groups);
-            }
-        }
-        if (!is_dir($dir)) {
-            mkdir($dir, 0775, true);
-        }
-
-        return $dir;
-    }
-
-    protected function clearMenuCache()
-    {
-        $this->configuredMenuItems = null;
-        // A request which read the old data can still write its menu after the files are removed
-        Configuration::updateGlobalValue(self::MENU_CACHE_VERSION_KEY, uniqid());
-        $this->cleanMenuCacheDirectory(_PS_CACHE_DIR_ . 'ps_mainmenu');
-    }
-
-    private function cleanMenuCacheDirectory($dir)
-    {
-        if (!is_dir($dir)) {
-            return;
-        }
-        foreach (scandir($dir) as $entry) {
-            if (in_array($entry, ['.', '..'])) {
-                continue;
-            }
-            $path = $dir . DIRECTORY_SEPARATOR . $entry;
-            if (is_dir($path)) {
-                $this->cleanMenuCacheDirectory($path);
-            } elseif (preg_match('/\.(json|html|tmp)$/', $entry)) {
-                @unlink($path);
-            }
-        }
-    }
-
-    public function hookActionShopDataDuplication($params)
-    {
-        /** @var array<int, array{'id_linksmenutop': int, 'id_shop': int, 'new_window': int}> $linksmenutop */
-        $linksmenutop = Db::getInstance()->executeS(
-            'SELECT * FROM ' . _DB_PREFIX_ . 'linksmenutop '
-            . 'WHERE id_shop = ' . (int) $params['old_id_shop']
-        );
-
-        foreach ($linksmenutop as $id => $link) {
-            Db::getInstance()->execute('
-				INSERT IGNORE INTO ' . _DB_PREFIX_ . 'linksmenutop (id_linksmenutop, id_shop, new_window)
-				VALUES (null, ' . (int) $params['new_id_shop'] . ', ' . (int) $link['new_window'] . ')');
-
-            $linksmenutop[$id]['new_id_linksmenutop'] = Db::getInstance()->Insert_ID();
-        }
-
-        foreach ($linksmenutop as $id => $link) {
-            $lang = Db::getInstance()->executeS('
-					SELECT id_lang, ' . (int) $params['new_id_shop'] . ', label, link
-					FROM ' . _DB_PREFIX_ . 'linksmenutop_lang
-					WHERE id_linksmenutop = ' . (int) $link['id_linksmenutop'] . ' AND id_shop = ' . (int) $params['old_id_shop']);
-
-            foreach ($lang as $l) {
-                Db::getInstance()->execute('
-					INSERT IGNORE INTO ' . _DB_PREFIX_ . 'linksmenutop_lang (id_linksmenutop, id_lang, id_shop, label, link)
-					VALUES (' . (int) $link['new_id_linksmenutop'] . ', ' . (int) $l['id_lang'] . ', ' . (int) $params['new_id_shop'] . ', ' . (int) $l['label'] . ', ' . (int) $l['link'] . ' )');
-            }
-        }
     }
 
     public function renderForm()
@@ -1314,11 +791,11 @@ class Ps_MainMenu extends Module implements WidgetInterface
     public function renderChoicesSelect()
     {
         $spacer = str_repeat('&nbsp;', $this->spacer_size);
-        $items = $this->getMenuItems();
+        $items = $this->getEditedMenuItems();
 
         $html = '<select multiple="multiple" id="availableItems" style="width: 300px; height: 160px;">';
         $html .= '<optgroup label="' . $this->trans('CMS', [], 'Modules.Mainmenu.Admin') . '">';
-        $html .= $this->getCMSOptions(0, 1, $this->context->language->id, $items);
+        $html .= $this->getCMSOptions(new CmsRepository(Db::getInstance()), 0, 1, $items);
         $html .= '</optgroup>';
 
         // BEGIN SUPPLIER
@@ -1350,9 +827,10 @@ class Ps_MainMenu extends Module implements WidgetInterface
         $html .= '<optgroup label="' . $this->trans('Categories', [], 'Admin.Global') . '">';
 
         $shops_to_get = Shop::getContextListShopID();
+        $categoryRepository = new CategoryRepository(Db::getInstance());
 
         foreach ($shops_to_get as $shop_id) {
-            $html .= $this->generateCategoriesOption($this->customGetNestedCategories($shop_id, null, (int) $this->context->language->id, false), $items);
+            $html .= $this->generateCategoriesOption($categoryRepository->getNestedCategoriesOfShop((int) $shop_id, (int) $this->context->language->id), $items);
         }
         $html .= '</optgroup>';
 
@@ -1380,74 +858,20 @@ class Ps_MainMenu extends Module implements WidgetInterface
 
         // BEGIN Menu Top Links
         $html .= '<optgroup label="' . $this->trans('Menu Top Links', [], 'Modules.Mainmenu.Admin') . '">';
-        $links = Ps_MenuTopLinks::gets($this->context->language->id, null, (int) Shop::getContextShopID());
-        foreach ($links as $link) {
-            if ($link['label'] == '') {
-                $default_language = Configuration::get('PS_LANG_DEFAULT');
-                $link = Ps_MenuTopLinks::get($link['id_linksmenutop'], $default_language, (int) Shop::getContextShopID());
-                if (!in_array('LNK' . (int) $link[0]['id_linksmenutop'], $items)) {
-                    $html .= '<option value="LNK' . (int) $link[0]['id_linksmenutop'] . '">' . $spacer . Tools::safeOutput($link[0]['label']) . '</option>';
-                }
-            } elseif (!in_array('LNK' . (int) $link['id_linksmenutop'], $items)) {
-                $html .= '<option value="LNK' . (int) $link['id_linksmenutop'] . '">' . $spacer . Tools::safeOutput($link['label']) . '</option>';
+        $id_shop = (int) Shop::getContextShopID();
+        foreach ($this->getLinkRepository()->findAll((int) $this->context->language->id, $id_shop) as $link) {
+            if (in_array('LNK' . (int) $link['id_linksmenutop'], $items)) {
+                continue;
             }
+            if ($link['label'] == '') {
+                $link = $this->getLinkRepository()->find((int) $link['id_linksmenutop'], (int) Configuration::get('PS_LANG_DEFAULT'), $id_shop);
+            }
+            $html .= '<option value="LNK' . (int) $link['id_linksmenutop'] . '">' . $spacer . Tools::safeOutput($link['label']) . '</option>';
         }
         $html .= '</optgroup>';
         $html .= '</select>';
 
         return $html;
-    }
-
-    public function customGetNestedCategories($shop_id, $root_category = null, $id_lang = false, $active = false, $groups = null, $use_shop_restriction = true, $sql_filter = '', $sql_sort = '', $sql_limit = '')
-    {
-        if (isset($root_category) && !Validate::isInt($root_category)) {
-            exit(Tools::displayError());
-        }
-
-        if (!Validate::isBool($active)) {
-            exit(Tools::displayError());
-        }
-
-        if (isset($groups) && Group::isFeatureActive() && !is_array($groups)) {
-            $groups = (array) $groups;
-        }
-
-        $cache_id = 'Category::getNestedCategories_' . md5((int) $shop_id . (int) $root_category . (int) $id_lang . (int) $active . (int) $active
-            . (isset($groups) && Group::isFeatureActive() ? implode('', $groups) : ''));
-
-        if (!Cache::isStored($cache_id)) {
-            $result = Db::getInstance()->executeS('
-							SELECT c.*, cl.*
-				FROM `' . _DB_PREFIX_ . 'category` c
-				INNER JOIN `' . _DB_PREFIX_ . 'category_shop` category_shop ON (category_shop.`id_category` = c.`id_category` AND category_shop.`id_shop` = "' . (int) $shop_id . '")
-				LEFT JOIN `' . _DB_PREFIX_ . 'category_lang` cl ON (c.`id_category` = cl.`id_category` AND cl.`id_shop` = "' . (int) $shop_id . '")
-				WHERE 1 ' . $sql_filter . ' ' . ($id_lang ? 'AND cl.`id_lang` = ' . (int) $id_lang : '') . '
-				' . ($active ? ' AND (c.`active` = 1 OR c.`is_root_category` = 1)' : '') . '
-				' . (isset($groups) && Group::isFeatureActive() ? ' AND cg.`id_group` IN (' . implode(',', $groups) . ')' : '') . '
-				' . (!$id_lang || (isset($groups) && Group::isFeatureActive()) ? ' GROUP BY c.`id_category`' : '') . '
-				' . ($sql_sort != '' ? $sql_sort : ' ORDER BY c.`level_depth` ASC') . '
-				' . ($sql_sort == '' && $use_shop_restriction ? ', category_shop.`position` ASC' : '') . '
-				' . ($sql_limit != '' ? $sql_limit : '')
-            );
-
-            $categories = [];
-            $buff = [];
-
-            foreach ($result as $row) {
-                $current = &$buff[$row['id_category']];
-                $current = $row;
-
-                if ($row['id_parent'] == 0) {
-                    $categories[$row['id_category']] = &$current;
-                } else {
-                    $buff[$row['id_parent']]['children'][$row['id_category']] = &$current;
-                }
-            }
-
-            Cache::store($cache_id, $categories);
-        }
-
-        return Cache::retrieve($cache_id);
     }
 
     public function getAddLinkFieldsValues()
@@ -1457,7 +881,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
         $new_window_edit = '';
 
         if (Tools::isSubmit('updatelinksmenutop')) {
-            $link = Ps_MenuTopLinks::getLinkLang(Tools::getValue('id_linksmenutop'), (int) Shop::getContextShopID());
+            $link = $this->getLinkRepository()->getTranslations((int) Tools::getValue('id_linksmenutop'), (int) Shop::getContextShopID());
 
             foreach ($link['link'] as $key => $label) {
                 $link['link'][$key] = Tools::htmlentitiesDecodeUTF8($label);
@@ -1496,7 +920,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
         $links = [];
 
         foreach ($shops as $shop_id) {
-            $links = array_merge($links, Ps_MenuTopLinks::gets((int) $this->context->language->id, null, (int) $shop_id));
+            $links = array_merge($links, $this->getLinkRepository()->findAll((int) $this->context->language->id, (int) $shop_id));
         }
 
         $fields_list = [
@@ -1537,168 +961,5 @@ class Ps_MainMenu extends Module implements WidgetInterface
         $helper->currentIndex = $this->context->link->getAdminLink('AdminModules', true, [], ['configure' => $this->name, 'tab_module' => $this->tab, 'module_name' => $this->name]);
 
         return $helper->generateList($links, $fields_list);
-    }
-
-    private function getCurrentPageIdentifier()
-    {
-        $controllerName = Dispatcher::getInstance()->getController();
-        if ($controllerName === 'cms' && ($id = Tools::getValue('id_cms'))) {
-            return 'cms-page-' . $id;
-        } elseif ($controllerName === 'category' && ($id = Tools::getValue('id_category'))) {
-            return 'category-' . $id;
-        } elseif ($controllerName === 'cms' && ($id = Tools::getValue('id_cms_category'))) {
-            return 'cms-category-' . $id;
-        } elseif ($controllerName === 'manufacturer' && ($id = Tools::getValue('id_manufacturer'))) {
-            return 'manufacturer-' . $id;
-        } elseif ($controllerName === 'manufacturer') {
-            return 'manufacturers';
-        } elseif ($controllerName === 'supplier' && ($id = Tools::getValue('id_supplier'))) {
-            return 'supplier-' . $id;
-        } elseif ($controllerName === 'supplier') {
-            return 'suppliers';
-        } elseif ($controllerName === 'product' && ($id = Tools::getValue('id_product'))) {
-            return 'product-' . $id;
-        } elseif ($controllerName === 'index') {
-            return 'shop-' . $this->context->shop->id;
-        } else {
-            $scheme = 'http';
-            if (array_key_exists('REQUEST_SCHEME', $_SERVER)) {
-                $scheme = $_SERVER['REQUEST_SCHEME'];
-            }
-
-            return "$scheme://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
-        }
-    }
-
-    public function getWidgetVariables($hookName, array $configuration)
-    {
-        $menu = $this->getMenu();
-        $this->markCurrentNode($menu, $this->getCurrentPageIdentifier());
-
-        return $menu;
-    }
-
-    public function renderWidget($hookName, array $configuration)
-    {
-        $cacheFile = $this->getRenderedMenuCacheFile();
-        if ($cacheFile !== null) {
-            $html = @file_get_contents($cacheFile);
-            if ($html !== false) {
-                return $html;
-            }
-        }
-
-        $menu = $this->getWidgetVariables($hookName, $configuration);
-
-        Hook::exec('actionMainMenuModifier', ['menu' => &$menu]);
-
-        $this->smarty->assign([
-            'menu' => $menu,
-        ]);
-
-        $html = $this->fetch('module:ps_mainmenu/ps_mainmenu.tpl');
-        if ($cacheFile !== null) {
-            $this->writeFile($cacheFile, $html);
-        }
-
-        return $html;
-    }
-
-    /**
-     * The markup is the same on every page which is not in the menu, so it is stored once for all of them.
-     * It follows the Smarty cache setting of the shop, and is not used when a module alters the menu.
-     *
-     * @return string|null Null when the menu must be rendered
-     */
-    private function getRenderedMenuCacheFile()
-    {
-        if (!Configuration::get('PS_SMARTY_CACHE')
-            || (int) Configuration::get('PS_SMARTY_FORCE_COMPILE') === _PS_SMARTY_FORCE_COMPILE_
-            || Hook::getHookModuleExecList('actionMainMenuModifier')
-        ) {
-            return null;
-        }
-
-        $template = $this->getTemplatePath('ps_mainmenu.tpl');
-        if (!$template) {
-            return null;
-        }
-
-        $pageIdentifiers = $this->getMenuPageIdentifiers();
-        if (isset($pageIdentifiers[$this->getCurrentPageIdentifier()])) {
-            return null;
-        }
-
-        // A change of theme or of template gives another file
-        return $this->getMenuCacheFile('_' . md5($template . @filemtime($template)) . '.html');
-    }
-
-    /**
-     * @return array<string, bool> Identifiers of the pages of the menu, as keys
-     */
-    private function getMenuPageIdentifiers()
-    {
-        $cacheFile = $this->getMenuCacheFile('_pages.json');
-        $pageIdentifiers = $this->readCacheFile($cacheFile);
-        if ($pageIdentifiers === null) {
-            $pageIdentifiers = [];
-            $this->collectPageIdentifiers($this->getMenu(), $pageIdentifiers);
-            $this->writeCacheFile($cacheFile, $pageIdentifiers);
-        }
-
-        return $pageIdentifiers;
-    }
-
-    private function collectPageIdentifiers(array $node, array &$identifiers)
-    {
-        if ($node['page_identifier'] !== null) {
-            $identifiers[$node['page_identifier']] = true;
-        }
-        foreach ($node['children'] as $child) {
-            $this->collectPageIdentifiers($child, $identifiers);
-        }
-    }
-
-    private function getMenu()
-    {
-        $cacheFile = $this->getMenuCacheFile();
-        $menu = $this->readCacheFile($cacheFile);
-        if ($menu === null) {
-            $menu = $this->makeMenu();
-            $this->writeCacheFile($cacheFile, $menu);
-        }
-
-        return $menu;
-    }
-
-    private function getMenuCacheFile($suffix = '.json')
-    {
-        $this->user_groups = Customer::getGroupsStatic($this->context->customer->id);
-        $groupsKey = empty($this->user_groups) ? '' : '_' . join('_', $this->user_groups);
-        $version = preg_replace('/[^a-z0-9]/i', '', (string) Configuration::getGlobalValue(self::MENU_CACHE_VERSION_KEY));
-
-        return $this->getCacheDirectory() . DIRECTORY_SEPARATOR . self::MENU_JSON_CACHE_KEY
-            . '_' . (int) $this->context->language->id . '_' . (int) $this->context->shop->id . $groupsKey . '_v' . $version . $suffix;
-    }
-
-    private function readCacheFile($file)
-    {
-        $data = json_decode((string) @file_get_contents($file), true);
-
-        return is_array($data) ? $data : null;
-    }
-
-    private function writeCacheFile($file, array $data)
-    {
-        $this->writeFile($file, json_encode($data));
-    }
-
-    private function writeFile($file, $content)
-    {
-        // Written aside then renamed, so that a concurrent request never reads a partial file
-        $temporaryFile = $file . uniqid('.', true) . '.tmp';
-        if (@file_put_contents($temporaryFile, $content) === false || !@rename($temporaryFile, $file)) {
-            @unlink($temporaryFile);
-        }
     }
 }

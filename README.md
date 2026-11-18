@@ -6,7 +6,7 @@ Make it easy for your visitors to find their way on your store, select the right
 
 ## Compatibility
 
-PrestaShop: `1.7.1.0` or later
+PrestaShop: `9.0.0` or later
 
 ## How to test
 
