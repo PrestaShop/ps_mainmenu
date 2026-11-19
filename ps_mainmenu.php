@@ -976,12 +976,12 @@ class Ps_MainMenu extends Module implements WidgetInterface
 
     public function hookActionObjectSupplierUpdateAfter($params)
     {
-        $this->clearMenuCacheForObject($params, 'SUP', ['ALLSUP0']);
+        $this->clearMenuCacheForObject($params, 'SUP', ['ALLSUP0'], ['PRD']);
     }
 
     public function hookActionObjectSupplierDeleteAfter($params)
     {
-        $this->clearMenuCacheForObject($params, 'SUP', ['ALLSUP0']);
+        $this->clearMenuCacheForObject($params, 'SUP', ['ALLSUP0'], ['PRD']);
     }
 
     public function hookActionObjectSupplierAddAfter($params)
@@ -991,12 +991,12 @@ class Ps_MainMenu extends Module implements WidgetInterface
 
     public function hookActionObjectManufacturerUpdateAfter($params)
     {
-        $this->clearMenuCacheForObject($params, 'MAN', ['ALLMAN0']);
+        $this->clearMenuCacheForObject($params, 'MAN', ['ALLMAN0'], ['PRD']);
     }
 
     public function hookActionObjectManufacturerDeleteAfter($params)
     {
-        $this->clearMenuCacheForObject($params, 'MAN', ['ALLMAN0']);
+        $this->clearMenuCacheForObject($params, 'MAN', ['ALLMAN0'], ['PRD']);
     }
 
     public function hookActionObjectManufacturerAddAfter($params)
@@ -1087,7 +1087,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
         if ($this->configuredMenuItems === null) {
             $this->configuredMenuItems = [];
             $rows = Db::getInstance()->executeS(
-                'SELECT `value` FROM `' . _DB_PREFIX_ . 'configuration` WHERE `name` = "MOD_BLOCKTOPMENU_ITEMS"'
+                'SELECT `value` FROM `' . _DB_PREFIX_ . 'configuration` WHERE `name` = \'MOD_BLOCKTOPMENU_ITEMS\''
             );
             foreach ($rows ?: [] as $row) {
                 $this->configuredMenuItems = array_merge($this->configuredMenuItems, explode(',', (string) $row['value']));
