@@ -5,7 +5,6 @@ parameters:
   ignoreErrors:
     - '#Access to an undefined property HelperList\:\:\$shopLinkType.#'
     - '#Call to method assign\(\) on an unknown class Smarty_Data.#'
-    - '#Parameter \#1 \$cms of method LinkCore\:\:getCMSLink\(\) expects CMS, int given.#'
     - '#Parameter \#1 \$id of class Supplier constructor expects null, int given.#'
     - '#Parameter \#1 \$idCategory of class Category constructor expects null, int given.#'
     - '#Parameter \#2 \$idLang of class Category constructor expects null, int given.#'
