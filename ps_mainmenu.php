@@ -40,11 +40,6 @@ class Ps_MainMenu extends Module implements WidgetInterface
 
     const MENU_JSON_CACHE_KEY = 'MOD_BLOCKTOPMENU_MENU_JSON';
 
-    /**
-     * Changes each time the cache is cleared, so that a menu built from older data is never read.
-     */
-    const MENU_CACHE_VERSION_KEY = 'MOD_BLOCKTOPMENU_CACHE_VERSION';
-
     protected $_menu = '';
     protected $_html = '';
     protected $user_groups;
@@ -69,11 +64,6 @@ class Ps_MainMenu extends Module implements WidgetInterface
      * Array of files from the category image directory
      */
     private $imageFiles;
-
-    /**
-     * @var string[]|null
-     */
-    private $configuredMenuItems;
 
     public function __construct()
     {
@@ -162,7 +152,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
         $this->clearMenuCache();
 
         if ($delete_params) {
-            if (!$this->uninstallDB() || !Configuration::deleteByName('MOD_BLOCKTOPMENU_ITEMS') || !Configuration::deleteByName(self::MENU_CACHE_VERSION_KEY)) {
+            if (!$this->uninstallDB() || !Configuration::deleteByName('MOD_BLOCKTOPMENU_ITEMS')) {
                 return false;
             }
         }
@@ -402,32 +392,27 @@ class Ps_MainMenu extends Module implements WidgetInterface
         $items = Tools::getValue('items');
         if (is_array($items) && count($items)) {
             return $items;
-        }
-
-        return $this->getSavedMenuItems();
-    }
-
-    protected function getSavedMenuItems()
-    {
-        $shops = Shop::getContextListShopID();
-        $conf = null;
-
-        if (count($shops) > 1) {
-            foreach ($shops as $key => $shop_id) {
-                $shop_group_id = Shop::getGroupFromShop($shop_id);
-                $conf .= (string) ($key > 1 ? ',' : '') . Configuration::get('MOD_BLOCKTOPMENU_ITEMS', null, $shop_group_id, $shop_id);
-            }
         } else {
-            $shop_id = (int) $shops[0];
-            $shop_group_id = Shop::getGroupFromShop($shop_id);
-            $conf = Configuration::get('MOD_BLOCKTOPMENU_ITEMS', null, $shop_group_id, $shop_id);
-        }
+            $shops = Shop::getContextListShopID();
+            $conf = null;
 
-        if (strlen($conf)) {
-            return explode(',', $conf);
-        }
+            if (count($shops) > 1) {
+                foreach ($shops as $key => $shop_id) {
+                    $shop_group_id = Shop::getGroupFromShop($shop_id);
+                    $conf .= (string) ($key > 1 ? ',' : '') . Configuration::get('MOD_BLOCKTOPMENU_ITEMS', null, $shop_group_id, $shop_id);
+                }
+            } else {
+                $shop_id = (int) $shops[0];
+                $shop_group_id = Shop::getGroupFromShop($shop_id);
+                $conf = Configuration::get('MOD_BLOCKTOPMENU_ITEMS', null, $shop_group_id, $shop_id);
+            }
 
-        return [];
+            if (strlen($conf)) {
+                return explode(',', $conf);
+            } else {
+                return [];
+            }
+        }
     }
 
     protected function makeMenuOption()
@@ -554,9 +539,8 @@ class Ps_MainMenu extends Module implements WidgetInterface
                 'page_identifier' => 'cms-page-' . $page['id_cms'],
                 'label' => $page['meta_title'],
                 'url' => $this->context->link->getCMSLink(
-                    (int) $page['id_cms'],
-                    $page['link_rewrite'],
-                    null,
+                    new CMS($page['id_cms'], $id_lang),
+                    null, null,
                     $id_lang
                 ),
             ]);
@@ -581,7 +565,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
             'children' => [],
         ]);
 
-        $menu_items = $this->getSavedMenuItems();
+        $menu_items = $this->getMenuItems();
         $id_lang = (int) $this->context->language->id;
         $id_shop = (int) Shop::getContextShopID();
 
@@ -602,7 +586,7 @@ class Ps_MainMenu extends Module implements WidgetInterface
                     break;
 
                 case 'PRD':
-                    $product = new Product((int) $id, false, (int) $id_lang);
+                    $product = new Product((int) $id, true, (int) $id_lang);
                     if ($product->id) {
                         $root_node['children'][] = $this->makeNode([
                             'type' => 'product',
@@ -637,8 +621,8 @@ class Ps_MainMenu extends Module implements WidgetInterface
                             'page_identifier' => 'manufacturer-' . $manufacturer['id_manufacturer'],
                             'label' => $manufacturer['name'],
                             'url' => $this->context->link->getManufacturerLink(
-                                (int) $manufacturer['id_manufacturer'],
-                                Tools::str2url($manufacturer['name']),
+                                new Manufacturer($manufacturer['id_manufacturer'], $id_lang),
+                                null,
                                 $id_lang
                             ),
                         ]);
@@ -677,8 +661,8 @@ class Ps_MainMenu extends Module implements WidgetInterface
                             'page_identifier' => 'supplier-' . $supplier['id_supplier'],
                             'label' => $supplier['name'],
                             'url' => $this->context->link->getSupplierLink(
-                                (int) $supplier['id_supplier'],
-                                Tools::str2url($supplier['name']),
+                                new Supplier($supplier['id_supplier'], $id_lang),
+                                null,
                                 $id_lang
                             ),
                         ]);
@@ -739,25 +723,11 @@ class Ps_MainMenu extends Module implements WidgetInterface
             }
         }
 
-        $this->setDepth($root_node, 0);
+        return $this->mapTree(function ($node, $depth) {
+            $node['depth'] = $depth;
 
-        return $root_node;
-    }
-
-    private function setDepth(array &$node, $depth)
-    {
-        $node['depth'] = $depth;
-        foreach ($node['children'] as &$child) {
-            $this->setDepth($child, $depth + 1);
-        }
-    }
-
-    private function markCurrentNode(array &$node, $page_identifier)
-    {
-        $node['current'] = ($page_identifier === $node['page_identifier']);
-        foreach ($node['children'] as &$child) {
-            $this->markCurrentNode($child, $page_identifier);
-        }
+            return $node;
+        }, $root_node);
     }
 
     protected function mapTree(callable $cb, array $node, $depth = 0)
@@ -793,15 +763,14 @@ class Ps_MainMenu extends Module implements WidgetInterface
         $nodes = [];
 
         foreach ($categories as $key => $category) {
-            /* Whenever a category is not active we shouldnt display it to customer */
-            if ((bool) $category['active'] === false) {
-                continue;
-            }
-
             $node = $this->makeNode([]);
-            // No access check: getNestedCategories() only returns the categories of the customer groups
             if ($category['level_depth'] > 1) {
-                $link = $this->context->link->getCategoryLink((int) $category['id_category'], $category['link_rewrite']);
+                $cat = new Category($category['id_category']);
+                $link = $cat->getLink();
+                // Check if customer is set and check access
+                if (Validate::isLoadedObject($this->context->customer) && !$cat->checkAccess($this->context->customer->id)) {
+                    continue;
+                }
             } else {
                 $link = $this->context->link->getPageLink('index');
             }
@@ -809,7 +778,14 @@ class Ps_MainMenu extends Module implements WidgetInterface
             $node['url'] = $link;
             $node['type'] = 'category';
             $node['page_identifier'] = 'category-' . $category['id_category'];
-            $node['current'] = false;
+
+            /* Whenever a category is not active we shouldnt display it to customer */
+            if ((bool) $category['active'] === false) {
+                continue;
+            }
+
+            $current = $this->page_name == 'category' && (int) Tools::getValue('id_category') == (int) $category['id_category'];
+            $node['current'] = $current;
             $node['label'] = $category['name'];
             $node['image_urls'] = [];
 
@@ -817,32 +793,23 @@ class Ps_MainMenu extends Module implements WidgetInterface
                 $node['children'] = $this->generateCategoriesMenu($category['children'], 1);
             }
 
-            foreach ($this->getCategoryThumbnails((int) $category['id_category']) as $file) {
-                $node['image_urls'][] = $this->context->link->getMediaLink(_THEME_CAT_DIR_ . $file);
+            if ($this->imageFiles === null) {
+                $this->imageFiles = scandir(_PS_CAT_IMG_DIR_);
+            }
+
+            if (count(preg_grep('/^' . $category['id_category'] . '-([0-9])?_thumb.jpg/i', $this->imageFiles)) > 0) {
+                foreach ($this->imageFiles as $file) {
+                    if (preg_match('/^' . $category['id_category'] . '-([0-9])?_thumb.jpg/i', $file) === 1) {
+                        $image_url = $this->context->link->getMediaLink(_THEME_CAT_DIR_ . $file);
+                        $node['image_urls'][] = $image_url;
+                    }
+                }
             }
 
             $nodes[] = $node;
         }
 
         return $nodes;
-    }
-
-    /**
-     * @return string[] Menu thumbnail files of the category
-     */
-    private function getCategoryThumbnails($id_category)
-    {
-        if ($this->imageFiles === null) {
-            $this->imageFiles = [];
-            $files = is_dir(_PS_CAT_IMG_DIR_) ? scandir(_PS_CAT_IMG_DIR_) : [];
-            foreach ($files as $file) {
-                if (preg_match('/^([0-9]+)-([0-9])?_thumb.jpg/i', $file, $matches) === 1) {
-                    $this->imageFiles[(int) $matches[1]][] = $file;
-                }
-            }
-        }
-
-        return isset($this->imageFiles[$id_category]) ? $this->imageFiles[$id_category] : [];
     }
 
     protected function getCMSOptions($parent = 0, $depth = 1, $id_lang = false, $items_to_skip = null, $id_shop = false)
@@ -946,155 +913,87 @@ class Ps_MainMenu extends Module implements WidgetInterface
 
     public function hookActionObjectCategoryAddAfter($params)
     {
-        $this->clearMenuCacheForCategories();
+        $this->clearMenuCache();
     }
 
     public function hookActionObjectCategoryUpdateAfter($params)
     {
-        $this->clearMenuCacheForCategories();
+        $this->clearMenuCache();
     }
 
     public function hookActionObjectCategoryDeleteAfter($params)
     {
-        $this->clearMenuCacheForCategories();
+        $this->clearMenuCache();
     }
 
     public function hookActionObjectCmsUpdateAfter($params)
     {
-        $this->clearMenuCacheForObject($params, 'CMS', [], ['CMS_CAT']);
+        $this->clearMenuCache();
     }
 
     public function hookActionObjectCmsDeleteAfter($params)
     {
-        $this->clearMenuCacheForObject($params, 'CMS', [], ['CMS_CAT']);
+        $this->clearMenuCache();
     }
 
     public function hookActionObjectCmsAddAfter($params)
     {
-        $this->clearMenuCacheIfUsed([], ['CMS_CAT']);
+        $this->clearMenuCache();
     }
 
     public function hookActionObjectSupplierUpdateAfter($params)
     {
-        $this->clearMenuCacheForObject($params, 'SUP', ['ALLSUP0'], ['PRD']);
+        $this->clearMenuCache();
     }
 
     public function hookActionObjectSupplierDeleteAfter($params)
     {
-        $this->clearMenuCacheForObject($params, 'SUP', ['ALLSUP0'], ['PRD']);
+        $this->clearMenuCache();
     }
 
     public function hookActionObjectSupplierAddAfter($params)
     {
-        $this->clearMenuCacheIfUsed(['ALLSUP0']);
+        $this->clearMenuCache();
     }
 
     public function hookActionObjectManufacturerUpdateAfter($params)
     {
-        $this->clearMenuCacheForObject($params, 'MAN', ['ALLMAN0'], ['PRD']);
+        $this->clearMenuCache();
     }
 
     public function hookActionObjectManufacturerDeleteAfter($params)
     {
-        $this->clearMenuCacheForObject($params, 'MAN', ['ALLMAN0'], ['PRD']);
+        $this->clearMenuCache();
     }
 
     public function hookActionObjectManufacturerAddAfter($params)
     {
-        $this->clearMenuCacheIfUsed(['ALLMAN0']);
+        $this->clearMenuCache();
     }
 
     public function hookActionObjectProductUpdateAfter($params)
     {
-        $this->clearMenuCacheForObject($params, 'PRD');
+        $this->clearMenuCache();
     }
 
     public function hookActionObjectProductDeleteAfter($params)
     {
-        $this->clearMenuCacheForObject($params, 'PRD');
+        $this->clearMenuCache();
     }
 
     public function hookActionObjectProductAddAfter($params)
     {
-        // A product that has just been created cannot be in a menu yet
+        $this->clearMenuCache();
     }
 
     public function hookActionCategoryUpdate($params)
     {
-        $this->clearMenuCacheForCategories();
+        $this->clearMenuCache();
     }
 
     public function hookActionMetaPageSave($params)
     {
         $this->clearMenuCache();
-    }
-
-    /**
-     * Product links can hold a category rewrite, so product items depend on categories as well.
-     */
-    private function clearMenuCacheForCategories()
-    {
-        $this->clearMenuCacheIfUsed([], ['CAT', 'PRD']);
-    }
-
-    /**
-     * @param array $params Parameters of an actionObject*After hook
-     * @param string $item_type Type of the menu item pointing to this object
-     * @param string[] $items Other menu items showing this object
-     * @param string[] $item_types Other types of menu items showing this object
-     */
-    private function clearMenuCacheForObject($params, $item_type, array $items = [], array $item_types = [])
-    {
-        if (!isset($params['object']->id)) {
-            $this->clearMenuCache();
-
-            return;
-        }
-
-        $items[] = $item_type . (int) $params['object']->id;
-        $this->clearMenuCacheIfUsed($items, $item_types);
-    }
-
-    /**
-     * Clears the cache only when a menu shows one of these items.
-     *
-     * @param string[] $items Menu items, e.g. PRD12
-     * @param string[] $item_types Types of menu items, e.g. CAT
-     */
-    private function clearMenuCacheIfUsed(array $items, array $item_types = [])
-    {
-        foreach ($this->getConfiguredMenuItems() as $configured_item) {
-            if (in_array($configured_item, $items)) {
-                $this->clearMenuCache();
-
-                return;
-            }
-            foreach ($item_types as $item_type) {
-                if (preg_match('/^' . $item_type . '[0-9]+$/', $configured_item) === 1) {
-                    $this->clearMenuCache();
-
-                    return;
-                }
-            }
-        }
-    }
-
-    /**
-     * @return string[] Items of the menus of every shop
-     */
-    private function getConfiguredMenuItems()
-    {
-        if ($this->configuredMenuItems === null) {
-            $this->configuredMenuItems = [];
-            $rows = Db::getInstance()->executeS(
-                'SELECT `value` FROM `' . _DB_PREFIX_ . 'configuration` WHERE `name` = \'MOD_BLOCKTOPMENU_ITEMS\''
-            );
-            foreach ($rows ?: [] as $row) {
-                $this->configuredMenuItems = array_merge($this->configuredMenuItems, explode(',', (string) $row['value']));
-            }
-        }
-
-        return $this->configuredMenuItems;
     }
 
     protected function getCacheDirectory()
@@ -1116,9 +1015,6 @@ class Ps_MainMenu extends Module implements WidgetInterface
 
     protected function clearMenuCache()
     {
-        $this->configuredMenuItems = null;
-        // A request which read the old data can still write its menu after the files are removed
-        Configuration::updateGlobalValue(self::MENU_CACHE_VERSION_KEY, uniqid());
         $this->cleanMenuCacheDirectory(_PS_CACHE_DIR_ . 'ps_mainmenu');
     }
 
@@ -1134,8 +1030,8 @@ class Ps_MainMenu extends Module implements WidgetInterface
             $path = $dir . DIRECTORY_SEPARATOR . $entry;
             if (is_dir($path)) {
                 $this->cleanMenuCacheDirectory($path);
-            } elseif (preg_match('/\.(json|tmp)$/', $entry)) {
-                @unlink($path);
+            } elseif (preg_match('/\.json$/', $entry)) {
+                unlink($path);
             }
         }
     }
@@ -1572,10 +1468,30 @@ class Ps_MainMenu extends Module implements WidgetInterface
 
     public function getWidgetVariables($hookName, array $configuration)
     {
-        $menu = $this->getMenu();
-        $this->markCurrentNode($menu, $this->getCurrentPageIdentifier());
+        $id_lang = $this->context->language->id;
+        $id_shop = $this->context->shop->id;
 
-        return $menu;
+        $this->user_groups = Customer::getGroupsStatic($this->context->customer->id);
+        $groupsKey = empty($this->user_groups) ? '' : '_' . join('_', $this->user_groups);
+        $key = self::MENU_JSON_CACHE_KEY . '_' . $id_lang . '_' . $id_shop . $groupsKey . '.json';
+        $cacheDir = $this->getCacheDirectory();
+        $cacheFile = $cacheDir . DIRECTORY_SEPARATOR . $key;
+        $menu = json_decode(@file_get_contents($cacheFile), true);
+        if (!is_array($menu) || json_last_error() !== JSON_ERROR_NONE) {
+            $menu = $this->makeMenu();
+            if (!is_dir($cacheDir)) {
+                mkdir($cacheDir);
+            }
+            file_put_contents($cacheFile, json_encode($menu));
+        }
+
+        $page_identifier = $this->getCurrentPageIdentifier();
+        // Mark the current page
+        return $this->mapTree(function (array $node) use ($page_identifier) {
+            $node['current'] = ($page_identifier === $node['page_identifier']);
+
+            return $node;
+        }, $menu);
     }
 
     public function renderWidget($hookName, array $configuration)
@@ -1589,43 +1505,5 @@ class Ps_MainMenu extends Module implements WidgetInterface
         ]);
 
         return $this->fetch('module:ps_mainmenu/ps_mainmenu.tpl');
-    }
-
-    private function getMenu()
-    {
-        $cacheFile = $this->getMenuCacheFile();
-        $menu = $this->readCacheFile($cacheFile);
-        if ($menu === null) {
-            $menu = $this->makeMenu();
-            $this->writeCacheFile($cacheFile, $menu);
-        }
-
-        return $menu;
-    }
-
-    private function getMenuCacheFile()
-    {
-        $this->user_groups = Customer::getGroupsStatic($this->context->customer->id);
-        $groupsKey = empty($this->user_groups) ? '' : '_' . join('_', $this->user_groups);
-        $version = preg_replace('/[^a-z0-9]/i', '', (string) Configuration::getGlobalValue(self::MENU_CACHE_VERSION_KEY));
-
-        return $this->getCacheDirectory() . DIRECTORY_SEPARATOR . self::MENU_JSON_CACHE_KEY
-            . '_' . (int) $this->context->language->id . '_' . (int) $this->context->shop->id . $groupsKey . '_v' . $version . '.json';
-    }
-
-    private function readCacheFile($file)
-    {
-        $data = json_decode((string) @file_get_contents($file), true);
-
-        return is_array($data) ? $data : null;
-    }
-
-    private function writeCacheFile($file, array $data)
-    {
-        // Written aside then renamed, so that a concurrent request never reads a partial file
-        $temporaryFile = $file . uniqid('.', true) . '.tmp';
-        if (@file_put_contents($temporaryFile, json_encode($data)) === false || !@rename($temporaryFile, $file)) {
-            @unlink($temporaryFile);
-        }
     }
 }
